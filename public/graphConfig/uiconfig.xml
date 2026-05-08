@@ -1,0 +1,114 @@
+<mxEditor>
+	<include name="keyhandler-commons.xml"/>
+	<ui>
+		<add as="graph" element="graph"/>
+		<!-- <add as="toolbar" element="toolbar"/> -->
+	</ui>
+	<Array as="templates">
+		<add as="rectangle">
+			<Rect>
+				<mxCell vertex="1" style="rectangle;strokeWidth=12;rotation=0;">	
+					<mxGeometry as="geometry" width="480" height="480"/>
+				</mxCell>
+			</Rect>
+		</add>
+		<add as="text">
+			<Text label="请输入">
+				<mxCell vertex="1"  style="text;fontSize=250;fontfamily=微软雅黑;rotation=0">	
+					<mxGeometry as="geometry" width="1440" height="480"/>
+				</mxCell>
+			</Text>
+		</add>
+		<add as="photo">
+			<Photo>
+				<!-- <mxCell vertex="1" style="photo;image=http://192.168.251.82:9091/api/static/markSource/logo.jpg;rotation=0;">	 -->
+				<mxCell vertex="1" style="photo;image=images/state.png;rotation=0;">	
+					<mxGeometry as="geometry" width="480" height="480"/>
+				</mxCell>
+			</Photo>
+		</add>
+		<add as="rounded">
+			<Roundrect>
+				<mxCell vertex="1" style="rounded;strokeWidth=12;rotation=0;">		
+					<mxGeometry as="geometry" width="480" height="480"/>
+				</mxCell>
+			</Roundrect>
+		</add>
+		<add as="ellipse">
+			<Ellipse>
+				<mxCell vertex="1" style="ellipse;strokeWidth=12;rotation=0;">		
+					<mxGeometry as="geometry" width="480" height="480"/>
+				</mxCell>
+			</Ellipse>
+		</add>
+	</Array>
+	<mxGraph as="graph"  dropEnabled="1">
+		<mxStylesheet as="stylesheet">
+			<add as="text">
+				<add as="shape" value="rectangle"/>
+				<add as="perimeter" value="rectanglePerimeter"/>
+				<add as="fontSize" value="12"/>
+				<add as="align" value="left"/>
+				<add as="verticalAlign" value="top"/>
+				<add as="shadow" value="0"/>
+				<add as="strokeColor" value="none"/>
+				<add as="fillColor" value="none"/>
+				<add as="gradientColor" value="none"/>
+				<add as="editable" value="1"/>
+
+			</add>
+			<add as="defaultVertex" extend="text">
+				<add as="shape" value="rectangle"/>
+				<add as="fontSize" value="11"/>
+				<add as="align" value="center"/>
+				<add as="verticalAlign" value="middle"/>
+				<add as="strokeColor" value="#000000"/>
+				<add as="gradientColor" value="white"/>
+			</add>
+			<add as="defaultEdge">
+				<add as="shape" value="connector"/>
+				<add as="align" value="center"/>
+				<add as="verticalAlign" value="middle"/>
+				<add as="rounded" value="1"/>
+				<add as="strokeColor" value="#000000"/>
+				<add as="strokeWidth" value="12"/>
+			</add>
+			<add as="rounded">
+				<add as="rounded" value="1"/>
+			</add>
+			<add as="ellipse">
+				<add as="shape" value="ellipse"/>
+				<add as="perimeter" value="ellipsePerimeter"/>
+				<add as="strokeColor" value="#000000"/>
+				<add as="rotation" value="0"/>
+			</add>
+			<add as="photo">
+				<add as="shape" value="image"/>
+				<add as="image" value="images/state.png"/>
+				<add as="rotation" value="0"/>
+				<add as="autosize" value="1"/>
+				<add as="editable" value="1"/>
+				<add as="imageAspect" value="0"/>
+			</add>
+			<add as="barcode">
+				<add as="shape" value="image"/>
+				<add as="perimeter" value="rectanglePerimeter"/>
+				<add as="fontSize" value="10"/>
+				<add as="align" value="center"/>
+				<add as="verticalAlign" value="middle"/>
+				<add as="rotation" value="0"/>
+				<add as="autosize" value="1"/>
+				<add as="resizable" value="0"/>
+				<add as="imageHeight" value="23"/>
+				<add as="imageWidth" value="23"/>
+				<add as="imageAspect" value="1"/>
+			</add>
+		</mxStylesheet>
+		<mxGraphModel as="model">
+			<root>
+				<mxCell id="0"/>
+				<mxCell id="1" parent="0"/>
+			</root>
+		</mxGraphModel>
+	</mxGraph>
+</mxEditor>
