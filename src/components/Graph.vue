@@ -14,8 +14,8 @@ const axisXRef = ref<HTMLCanvasElement | null>(null);
 const axisYRef = ref<HTMLCanvasElement | null>(null);
 let canvas: Canvas | null = null;
 let labelRect: Rect | null = null;
-const labelWidth = 6; //inch
-const labelheight = 4; //inch
+const labelWidth = 3; //inch
+const labelheight = 2; //inch
 const dpi = 200; // Standard screen DPI
 const selectedObject = ref<any>(null);
 const rulerThickness = 30;
@@ -74,24 +74,24 @@ function drawRulers() {
   const ty = vpt[5] ?? 0;
 
   // 标尺原点严格对齐 labelRect 的左上角 (0,0)
-  const originX = (labelRect.left || 0) * zoom + tx;
-  const originY = (labelRect.top || 0) * zoom + ty;
+  const originX = (-labelRect.width / 2 || 0) * zoom + tx;
+  const originY = (-labelRect.height / 2 || 0) * zoom + ty;
 
-  const majorStepWorld = getNiceStep(80 / zoom);
+  const majorStepWorld = getNiceStep(100 / zoom);
   const minorStepWorld = majorStepWorld / 10;
 
-  const minorTick = 6;
-  const majorTick = 12;
+  const minorTick = 5;
+  const majorTick = 10;
 
-  ctxX.strokeStyle = '#8a8f98';
+  ctxX.strokeStyle = '#00000';
   ctxX.fillStyle = '#36404a';
   ctxX.lineWidth = 1;
-  ctxX.font = '10px sans-serif';
+  ctxX.font = '14px sans-serif';
 
-  ctxY.strokeStyle = '#8a8f98';
+  ctxY.strokeStyle = '#00000';
   ctxY.fillStyle = '#36404a';
   ctxY.lineWidth = 1;
-  ctxY.font = '10px sans-serif';
+  ctxY.font = '14px sans-serif';
 
   const startXWorld = (0 - originX) / zoom;
   const endXWorld = (width - originX) / zoom;
@@ -297,10 +297,10 @@ function autoZoomintoLabel() {
 
 function addRect() {
   if (!canvas || !labelRect) return;
-  const { x, y } = labelLocalToWorldPoint(labelRect.width / 2 - 100, labelRect.height / 2 - 50, labelRect);
+  // const { x, y } = labelLocalToWorldPoint(labelRect.width / 2 - 100, labelRect.height / 2 - 50, labelRect);
   const rect = new Rect({
-    left: x,
-    top: y,
+    left: 0,
+    top: 0,
     fill: 'red',
     width: 100,
     height: 50,
