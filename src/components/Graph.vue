@@ -10,8 +10,6 @@ const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettin
 
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
-const axisXRef = ref<HTMLCanvasElement | null>(null);
-const axisYRef = ref<HTMLCanvasElement | null>(null);
 let canvas: Canvas | null = null;
 let labelRect: Rect | null = null;
 const labelWidth = 3; //inch
@@ -41,41 +39,27 @@ function getNiceStep(target: number): number {
 function drawRulers() {
   if (!canvas || !labelRect) return;
 
-  const axisX = axisXRef.value;
-  const axisY = axisYRef.value;
-  const graphEl = graphContainerRef.value;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
-  if (!axisX || !axisY || !graphEl) return;
+  const width = canvas.getWidth();
+  const height = canvas.getHeight();
 
-  const width = Math.max(0, graphEl.clientWidth);
-  const height = Math.max(0, graphEl.clientHeight);
-
-  axisX.width = width;
-  axisX.height = rulerThickness;
-  axisY.width = rulerThickness;
-  axisY.height = height;
-
-  const ctxX = axisX.getContext('2d');
-  const ctxY = axisY.getContext('2d');
-
-  if (!ctxX || !ctxY) return;
-
-  ctxX.clearRect(0, 0, width, rulerThickness);
-  ctxY.clearRect(0, 0, rulerThickness, height);
-
-  ctxX.fillStyle = '#f8f9fb';
-  ctxY.fillStyle = '#f8f9fb';
-  ctxX.fillRect(0, 0, width, rulerThickness);
-  ctxY.fillRect(0, 0, rulerThickness, height);
+  // Draw ruler backgrounds
+  ctx.fillStyle = '#f8f9fb';
+  ctx.fillRect(0, 0, width, rulerThickness); // X ruler background
+  ctx.fillRect(0, 0, rulerThickness, height); // Y ruler background
+  ctx.fillRect(0, 0, rulerThickness, rulerThickness); // Ruler corner background
 
   const vpt = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
   const zoom = canvas.getZoom();
   const tx = vpt[4] ?? 0;
   const ty = vpt[5] ?? 0;
 
-  // 标尺原点严格对齐 labelRect 的左上角 (0,0)
-  const originX = (-labelRect.width / 2 || 0) * zoom + tx;
-  const originY = (-labelRect.height / 2 || 0) * zoom + ty;
+  // The screen coordinates of the world origin (0,0)
+  // Since labelRect is at (0,0) and its origin is top-left, this is the screen position of labelRect's top-left.
+  const originX = tx;
+  const originY = ty;
 
   const majorStepWorld = getNiceStep(100 / zoom);
   const minorStepWorld = majorStepWorld / 10;
@@ -83,60 +67,64 @@ function drawRulers() {
   const minorTick = 5;
   const majorTick = 10;
 
-  ctxX.strokeStyle = '#00000';
-  ctxX.fillStyle = '#36404a';
-  ctxX.lineWidth = 1;
-  ctxX.font = '14px sans-serif';
+  ctx.strokeStyle = '#00000';
+  ctx.fillStyle = '#36404a';
+  ctx.lineWidth = 1;
+  ctx.font = '14px sans-serif';
 
-  ctxY.strokeStyle = '#00000';
-  ctxY.fillStyle = '#36404a';
-  ctxY.lineWidth = 1;
-  ctxY.font = '14px sans-serif';
-
+  // X-Ruler
+  // Calculate the world coordinates visible on the screen
   const startXWorld = (0 - originX) / zoom;
   const endXWorld = (width - originX) / zoom;
   const firstMinorX = Math.floor(startXWorld / minorStepWorld) * minorStepWorld;
 
   for (let worldX = firstMinorX; worldX <= endXWorld; worldX += minorStepWorld) {
     const screenX = originX + worldX * zoom;
+    // Only draw if the tick is within the visible canvas width
     if (screenX < 0 || screenX > width) continue;
 
     const scaled = worldX / majorStepWorld;
     const isMajor = Math.abs(scaled - Math.round(scaled)) < 1e-6;
 
-    ctxX.beginPath();
-    ctxX.moveTo(screenX + 0.5, rulerThickness);
-    ctxX.lineTo(screenX + 0.5, rulerThickness - (isMajor ? majorTick : minorTick));
-    ctxX.stroke();
+    ctx.beginPath();
+    // Draw tick from top of ruler (0) down to tick length
+    ctx.moveTo(screenX + 0.5, 0);
+    ctx.lineTo(screenX + 0.5, (isMajor ? majorTick : minorTick));
+    ctx.stroke();
 
     if (isMajor) {
-      ctxX.fillText(Math.round(worldX).toString(), screenX + 3, 11);
+      // Draw text below the tick, within the rulerThickness band
+      ctx.fillText(Math.round(worldX).toString(), screenX + 3, rulerThickness - 5);
     }
   }
 
+  // Y-Ruler
   const startYWorld = (0 - originY) / zoom;
   const endYWorld = (height - originY) / zoom;
   const firstMinorY = Math.floor(startYWorld / minorStepWorld) * minorStepWorld;
 
   for (let worldY = firstMinorY; worldY <= endYWorld; worldY += minorStepWorld) {
     const screenY = originY + worldY * zoom;
+    // Only draw if the tick is within the visible canvas height
     if (screenY < 0 || screenY > height) continue;
 
     const scaled = worldY / majorStepWorld;
     const isMajor = Math.abs(scaled - Math.round(scaled)) < 1e-6;
 
-    ctxY.beginPath();
-    ctxY.moveTo(rulerThickness, screenY + 0.5);
-    ctxY.lineTo(rulerThickness - (isMajor ? majorTick : minorTick), screenY + 0.5);
-    ctxY.stroke();
+    ctx.beginPath();
+    // Draw tick from left of ruler (0) right to tick length
+    ctx.moveTo(0, screenY + 0.5);
+    ctx.lineTo((isMajor ? majorTick : minorTick), screenY + 0.5);
+    ctx.stroke();
 
     if (isMajor) {
       const label = Math.round(worldY).toString();
-      ctxY.save();
-      ctxY.translate(11, screenY - 3);
-      ctxY.rotate(-Math.PI / 2);
-      ctxY.fillText(label, 0, 0);
-      ctxY.restore();
+      ctx.save();
+      // Translate to position for text, rotate, then draw
+      ctx.translate(rulerThickness - 5, screenY + 3); // Adjusted X position
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
     }
   }
 }
@@ -173,6 +161,7 @@ onMounted(() => {
   canvas = new Canvas(canvasEl);
 
   console.log(canvas.getWidth(), canvas.getHeight());
+  canvas.on('after:render', drawRulers); // Attach ruler drawing to after:render event
   // 标签矩形固定在 (0,0)，作为局部坐标系的起点
   labelRect = new Rect({
     left: 0,
@@ -227,7 +216,6 @@ onMounted(() => {
       vpt[4] += e.clientX - lastPosX;
       vpt[5] += e.clientY - lastPosY;
       canvas!.requestRenderAll();
-      drawRulers();
       lastPosX = e.clientX;
       lastPosY = e.clientY;
     }
@@ -245,7 +233,6 @@ onMounted(() => {
     if (zoom > 20) zoom = 20;
     if (zoom < 0.01) zoom = 0.01;
     canvas!.zoomToPoint(new Point(x, y), zoom);
-    drawRulers();
     opt.e.preventDefault();
     opt.e.stopPropagation();
   });
@@ -271,7 +258,6 @@ onMounted(() => {
   });
 
   autoZoomintoLabel();
-  drawRulers();
   window.addEventListener('resize', handleResize);
 });
 
@@ -292,7 +278,6 @@ function autoZoomintoLabel() {
     viewport.panY,
   ]);
   canvas.requestRenderAll();
-  drawRulers();
 }
 
 function addRect() {
@@ -472,25 +457,9 @@ function addText() {
 
     <!-- Main Canvas -->
     <v-main class="d-flex  align-center justify-center" style="background-color: #f0f0f0;">
-
-      <div class="h-100 w-100 d-flex flex-column ">
-        <div class="d-flex flex-column h-100">
-          <!-- <div class="toolbar">
-          <button @click="addRect">Add Rectangle</button>
-          <button @click="addEllipse">Add Ellipse</button>
-          <button @click="addLine">Add Line</button>
-          <button @click="addText">Add Text</button>
-          <button @click="clearCanvas">Clear</button>
-        </div> -->
-
-          <div class="graph-wrap flex-grow-1">
-            <canvas class="axisX" ref="axisXRef"></canvas>
-            <canvas class="axisY" ref="axisYRef"></canvas>
-            <div class="ruler-corner"></div>
-            <div class="graph" ref="graphContainerRef">
-              <canvas ref="graphref"></canvas>
-            </div>
-          </div>
+      <div class=" w-100 h-100 d-flex flex-column ">
+        <div class="graph d-flex flex-column graph-wrap flex-grow-1" ref="graphContainerRef">
+          <canvas ref="graphref"></canvas>
         </div>
       </div>
     </v-main>
@@ -510,49 +479,12 @@ function addText() {
 }
 
 .graph-wrap {
-  position: relative;
-  overflow: auto;
+  width: 100%;
+  height: calc(100% - 70px);
 
   .graph {
-    height: calc(100% - 30px);
     width: 100%;
-    border: 1px solid yellow;
-    z-index: -1;
-  }
-
-  .axisX,
-  .axisY {
-    position: absolute;
-    z-index: 1;
-  }
-
-  .axisX {
-    top: 0;
-    left: 30px;
-    width: calc(100% - 30px);
-    height: 30px;
-    border-bottom: 1px solid #0c3958;
-  }
-
-  .axisY {
-    top: 30px;
-    left: 0;
-    width: 30px;
-    height: calc(100% - 30px);
-    border-right: 1px solid #0c3958;
-  }
-
-  .ruler-corner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 30px;
-    height: 30px;
-    border-right: 1px solid #0c3958;
-    border-bottom: 1px solid #0c3958;
-    background: #f8f9fb;
-    z-index: 1;
-
+    height: 100%;
   }
 
   #property {
