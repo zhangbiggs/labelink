@@ -1,6 +1,11 @@
 <script lang="ts" setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Canvas, Rect, Ellipse, Textbox, Point, Polyline } from 'fabric'; // browser
+import {
+  clientToLabelLocalPoint,
+  getLabelViewport,
+  labelLocalToWorldPoint,
+} from '@/utils/coordinate';
 const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
 
 const graphContainerRef = ref<HTMLDivElement | null>(null);
@@ -19,14 +24,6 @@ Ellipse.prototype.setControlsVisibility({ mtr: false });
 Polyline.prototype.setControlsVisibility({ mtr: false });
 Textbox.prototype.setControlsVisibility({ mtr: false });
 const isPanningMode = ref(false);
-watch(selectedObject, (newVal) => {
-  console.log('selectedObject:', newVal);
-  // if (newVal === null) {
-  //   isPanningMode.value = true;
-  // } else {
-  //   isPanningMode.value = false;
-  // }
-});
 
 function getNiceStep(target: number): number {
   if (target <= 0) return 1;
@@ -76,8 +73,9 @@ function drawRulers() {
   const tx = vpt[4] ?? 0;
   const ty = vpt[5] ?? 0;
 
-  const originX = (labelRect.left ?? 0) * zoom + tx;
-  const originY = (labelRect.top ?? 0) * zoom + ty;
+  // 标尺原点严格对齐 labelRect 的左上角 (0,0)
+  const originX = (labelRect.left || 0) * zoom + tx;
+  const originY = (labelRect.top || 0) * zoom + ty;
 
   const majorStepWorld = getNiceStep(80 / zoom);
   const minorStepWorld = majorStepWorld / 10;
@@ -146,7 +144,6 @@ function drawRulers() {
 function handleResize() {
   const canvasEl = graphref.value;
   const containerEl = graphContainerRef.value;
-
   if (!canvas || !canvasEl || !containerEl) {
     return;
   }
@@ -158,7 +155,8 @@ function handleResize() {
     height: canvasEl.height,
   });
 
-  drawRulers();
+  // 窗口调整时，通过调整视口来保持标签居中
+  autoZoomintoLabel();
 }
 
 onMounted(() => {
@@ -168,26 +166,19 @@ onMounted(() => {
   if (!canvasEl || !containerEl) {
     return;
   }
-
   // Set canvas dimensions to match its container
   canvasEl.width = containerEl.clientWidth;
   canvasEl.height = containerEl.clientHeight;
 
   canvas = new Canvas(canvasEl);
 
-  const labelPixelWidth = labelWidth * dpi;
-  const labelPixelHeight = labelheight * dpi;
-
-  // Center the label area on the canvas
-  console.log('Canvas size:', canvas.width, canvas.height);
-  const left = (canvas.width! - labelPixelWidth) / 2;
-  const top = (canvas.height! - labelPixelHeight) / 2;
-  console.log('Label position:', left, top);
+  console.log(canvas.getWidth(), canvas.getHeight());
+  // 标签矩形固定在 (0,0)，作为局部坐标系的起点
   labelRect = new Rect({
-    left: left,
-    top: top,
-    width: labelPixelWidth,
-    height: labelPixelHeight,
+    left: 0,
+    top: 0,
+    width: labelWidth * dpi,
+    height: labelheight * dpi,
     fill: 'white',
     stroke: '#ccc',
     strokeDashArray: [5, 5],
@@ -202,16 +193,36 @@ onMounted(() => {
   let lastPosX: number, lastPosY: number;
 
   canvas.on('mouse:down', function (opt) {
-    if (opt.e.altKey || isPanningMode.value) {
+    const mouseEvent = opt.e as MouseEvent;
+    if (mouseEvent.altKey || isPanningMode.value) {
       isPanning = true;
-      lastPosX = opt.e.clientX;
-      lastPosY = opt.e.clientY;
+      lastPosX = mouseEvent.clientX;
+      lastPosY = mouseEvent.clientY;
+
+      const viewport = canvas?.viewportTransform
+        ? {
+          zoom: canvas.getZoom(),
+          panX: canvas.viewportTransform[4],
+          panY: canvas.viewportTransform[5],
+        }
+        : null;
+
+      if (viewport && labelRect && graphref.value) {
+        const localPoint = clientToLabelLocalPoint(
+          mouseEvent.clientX,
+          mouseEvent.clientY,
+          graphref.value,
+          viewport,
+          labelRect,
+        );
+        console.log('pointer local to label:', localPoint);
+      }
     }
   });
 
   canvas.on('mouse:move', (opt) => {
     if (isPanning) {
-      const e = opt.e;
+      const e = opt.e as MouseEvent;
       const vpt = canvas!.viewportTransform!;
       vpt[4] += e.clientX - lastPosX;
       vpt[5] += e.clientY - lastPosY;
@@ -251,7 +262,7 @@ onMounted(() => {
   canvas.on('selection:updated', (e) => {
     isPanningMode.value = false;
     if (e.selected) {
-      selectedObject.value = e.selected;
+      selectedObject.value = e.selected[0];
     }
   });
 
@@ -269,23 +280,27 @@ onBeforeUnmount(() => {
 });
 
 function autoZoomintoLabel() {
+  // 核心逻辑：不移动 labelRect，而是通过 setViewportTransform 平移视口
   if (!canvas || !labelRect) return;
-  const zoomX = canvas.width! / labelRect.width!;
-  const zoomY = canvas.height! / labelRect.height!;
-  const zoom = Math.min(zoomX, zoomY) * 0.7; // Add some padding
-
-  const panX = (canvas.width - labelRect.width * zoom) / 2;
-  const panY = (canvas.height - labelRect.height * zoom) / 2;
-
-  canvas.setViewportTransform([zoom, 0, 0, zoom, panX, panY]);
+  const viewport = getLabelViewport(canvas.getWidth(), canvas.getHeight(), labelRect);
+  canvas.setViewportTransform([
+    viewport.zoom,
+    0,
+    0,
+    viewport.zoom,
+    viewport.panX,
+    viewport.panY,
+  ]);
+  canvas.requestRenderAll();
   drawRulers();
 }
 
 function addRect() {
   if (!canvas || !labelRect) return;
+  const { x, y } = labelLocalToWorldPoint(labelRect.width / 2 - 100, labelRect.height / 2 - 50, labelRect);
   const rect = new Rect({
-    left: labelRect.left! + labelRect.width / 2 - 100,
-    top: labelRect.top! + labelRect.height / 2 - 50,
+    left: x,
+    top: y,
     fill: 'red',
     width: 100,
     height: 50,
@@ -296,9 +311,10 @@ function addRect() {
 
 function addEllipse() {
   if (!canvas || !labelRect) return;
+  const { x, y } = labelLocalToWorldPoint(50, 50, labelRect);
   const ellipse = new Ellipse({
-    left: labelRect.left! + 50,
-    top: labelRect.top! + 50,
+    left: x,
+    top: y,
     fill: 'blue',
     rx: 60,
     ry: 30,
@@ -309,24 +325,27 @@ function addEllipse() {
 
 function addLine() {
   if (!canvas || !labelRect) return;
+  const p1 = labelLocalToWorldPoint(10, 120, labelRect);
+  const p2 = labelLocalToWorldPoint(150, 100, labelRect);
   const polyline = new Polyline(
     [
-      { x: labelRect.left! + 10, y: labelRect.top! + 120 },
-      { x: labelRect.left! + 150, y: labelRect.top! + 100 }
+      { x: p1.x, y: p1.y },
+      { x: p2.x, y: p2.y }
     ], {
-      stroke: 'green',
-      strokeWidth: 2,
-      fill: '',
-    });
+    stroke: 'green',
+    strokeWidth: 2,
+    fill: '',
+  });
   canvas.add(polyline);
   canvas.setActiveObject(polyline);
 }
 
 function addText() {
   if (!canvas || !labelRect) return;
+  const { x, y } = labelLocalToWorldPoint(10, 150, labelRect);
   const text = new Textbox('Hello, world!', {
-    left: labelRect.left! + 10,
-    top: labelRect.top! + 150,
+    left: x,
+    top: y,
     width: 200,
     fill: 'black',
 
@@ -495,17 +514,16 @@ function addText() {
   overflow: auto;
 
   .graph {
-    position: absolute;
-    top: 30px;
-    left: 30px;
     height: calc(100% - 30px);
-    width: calc(100% - 30px);
-    border: 1px solid #cccccc6f;
+    width: 100%;
+    border: 1px solid yellow;
+    z-index: -1;
   }
 
   .axisX,
   .axisY {
     position: absolute;
+    z-index: 1;
   }
 
   .axisX {
@@ -533,6 +551,8 @@ function addText() {
     border-right: 1px solid #0c3958;
     border-bottom: 1px solid #0c3958;
     background: #f8f9fb;
+    z-index: 1;
+
   }
 
   #property {
