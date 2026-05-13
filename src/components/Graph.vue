@@ -14,19 +14,6 @@ import {
 import bwipjs from '@bwip-js/browser';
 
 
-export type ViewportLike = {
-  zoom: number;
-  panX: number;
-  panY: number;
-};
-
-export type LabelRectLike = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-};
-
 const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
@@ -148,8 +135,9 @@ function drawRulers() {
     ctx.stroke();
 
     if (isMajor) {
-      // Draw text below the tick, within the rulerThickness band
-      ctx.fillText(Math.round(worldX).toString(), screenX + 3, rulerThickness - 5);
+      const textWidth = ctx.measureText(Math.round(worldX).toString()).width;
+      let textX = screenX - textWidth / 2;
+      ctx.fillText(Math.round(worldX).toString(), textX, rulerThickness - 5);
     }
   }
 
@@ -175,8 +163,10 @@ function drawRulers() {
     if (isMajor) {
       const label = Math.round(worldY).toString();
       ctx.save();
+       const textWidth = ctx.measureText(Math.round(worldY).toString()).width;
+      let textX = screenY + textWidth / 2;
       // Translate to position for text, rotate, then draw
-      ctx.translate(rulerThickness - 5, screenY + 3); // Adjusted X position
+      ctx.translate(rulerThickness - 5, textX); // Adjusted X position
       ctx.rotate(-Math.PI / 2);
       ctx.fillText(label, 0, 0);
       ctx.restore();
