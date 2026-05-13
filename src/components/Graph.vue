@@ -1,15 +1,27 @@
 <script lang="ts" setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Canvas, Rect, Ellipse, Textbox, Point, Polyline } from 'fabric'; // browser
+import {
+  Canvas,
+  Rect,
+  Ellipse,
+  Textbox,
+  Point,
+  Polyline,
+  Image as FabricImage,
+  util,
+  loadSVGFromString,
+} from 'fabric'; // browser
+import bwipjs from 'bwip-js';
+
 import {
   clientToLabelLocalPoint,
   getLabelViewport,
   labelLocalToWorldPoint,
 } from '@/utils/coordinate';
 const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
-
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
+const imageRef = ref<HTMLImageElement | null>(null);
 let canvas: Canvas | null = null;
 let labelRect: Rect | null = null;
 const labelWidth = 3; //inch
@@ -22,7 +34,39 @@ Ellipse.prototype.setControlsVisibility({ mtr: false });
 Polyline.prototype.setControlsVisibility({ mtr: false });
 Textbox.prototype.setControlsVisibility({ mtr: false });
 const isPanningMode = ref(false);
-
+function addBarcode() {
+  if (!canvas || !labelRect) return;
+  try {
+    const svgString = bwipjs.toSVG({
+      bcid: 'code128', // Barcode type
+      text: '1234567890', // Text to encode
+      scale: 1, // 3x scaling factor
+      height: 10, // Barcode height, in mm
+      includetext: true, // Show human-readable text
+      textxalign: 'center', // Always good to set this
+    });
+    // 把svg 字符串转换成图片image，然后添加到canvas上，位置放在标签的左上角
+      const img = document.createElement('img');
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      img.src = url;
+      console.log('Generated SVG:', url);
+      img.onload = function() {
+        const fabricImage = new FabricImage(img, {
+          left: 0,
+          top: 0,
+          originX: 'left',    
+          originY: 'top',
+        });
+        canvas!.add(fabricImage);
+        canvas!.setActiveObject(fabricImage);
+        canvas!.requestRenderAll();
+        URL.revokeObjectURL(url);
+      };
+  } catch (e) {
+    console.error(e);
+  }
+}
 function getNiceStep(target: number): number {
   if (target <= 0) return 1;
 
@@ -166,6 +210,8 @@ onMounted(() => {
   labelRect = new Rect({
     left: 0,
     top: 0,
+    originX: 'left',
+    originY: 'top',
     width: labelWidth * dpi,
     height: labelheight * dpi,
     fill: 'white',
@@ -286,6 +332,8 @@ function addRect() {
   const rect = new Rect({
     left: 0,
     top: 0,
+    originX: 'left',
+    originY: 'top',
     fill: 'red',
     width: 100,
     height: 50,
@@ -300,6 +348,8 @@ function addEllipse() {
   const ellipse = new Ellipse({
     left: x,
     top: y,
+    originX: 'left',
+    originY: 'top',
     fill: 'blue',
     rx: 60,
     ry: 30,
@@ -331,6 +381,8 @@ function addText() {
   const text = new Textbox('Hello, world!', {
     left: x,
     top: y,
+    originX: 'left',
+    originY: 'top',
     width: 200,
     fill: 'black',
 
@@ -365,7 +417,7 @@ function addText() {
       <v-divider vertical inset class="mx-2"></v-divider>
       <v-btn icon="mdi-lock-outline"></v-btn>
       <v-btn icon="mdi-lock-open-outline"></v-btn>
-
+      <img ref="imageRef" src="" alt="">
       <v-spacer></v-spacer>
 
       <!-- This is a simplified version of the font and alignment controls -->
@@ -399,7 +451,7 @@ function addText() {
           <v-icon @click="isPanningMode = !isPanningMode">mdi-cursor-default-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
-          <v-icon>mdi-barcode</v-icon>
+          <v-icon @click="addBarcode">mdi-barcode</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
           <v-icon @click="addText">mdi-format-text</v-icon>
