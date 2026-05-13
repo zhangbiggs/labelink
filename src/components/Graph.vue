@@ -6,8 +6,10 @@ import {
   Ellipse,
   Textbox,
   Point,
+  Group,
   Polyline,
   Image as FabricImage,
+  loadSVGFromString,
 } from 'fabric'; // browser
 import bwipjs from '@bwip-js/browser';
 
@@ -33,23 +35,7 @@ Ellipse.prototype.setControlsVisibility({ mtr: false });
 Polyline.prototype.setControlsVisibility({ mtr: false });
 Textbox.prototype.setControlsVisibility({ mtr: false });
 const isPanningMode = ref(false);
-function svgStringToImage(svgString: string) {
-  // 1. 将字符串解析为 DOM 对象，提取 viewBox
-  const parser = new DOMParser();
-  const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
-  const svgElement = svgDoc.querySelector("svg");
 
-  // 获取 viewBox: "x y width height"
-  const viewBox = svgElement?.getAttribute("viewBox");
-  let width = svgElement?.getAttribute("width");
-  let height = svgElement?.getAttribute("height");
-
-  if (viewBox && (!width || !height)) {
-    const parts = viewBox.split(/\s+/);
-    width = parts[2];  // viewBox 的宽度
-    height = parts[3]; // viewBox 的高度
-  }
-}
 function addBarcode(bcid = 'code128', text = '1234567890') {
   if (!canvas || !labelRect) return;
   console.log('Adding barcode with text:', text);
@@ -61,36 +47,22 @@ function addBarcode(bcid = 'code128', text = '1234567890') {
       includetext: true, // Show human-readable text
       textxalign: 'center', // Always good to set this
     });
-    console.log('Generated SVG string:', svgString);
-    let [_, width, height] = /viewBox="0 0 (\d+) (\d+)"/.exec(svgString);
-    console.log(width, height)
-    // 把svg 字符串转换成图片image，然后添加到canvas上，位置放在标签的左上角
-    const img = document.createElement('img');
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-    img.src = url;
-    // img.width = +width;
-    // img.height = +height;
-    console.log(img.width, img.height);
-    imageRef.value!.src = url; // For debugging, show the generated SVG as an image
-    console.log('Generated SVG:', url);
-    img.onload = function () {
-      const fabricImage = new FabricImage(img, {
+    // console.log('Generated SVG string:', svgString);
+    loadSVGFromString(svgString).then((red:any) => {
+      console.log('Parsed SVG elements:', red);
+      const barcodeGroup = new Group(red.objects, {
         left: 0,
         top: 0,
-        width: +width,
-        height: +height,
         originX: 'left',
         originY: 'top',
       });
-      // fabricImage._setWidthHeight(+width, +height);
-      fabricImage.scaleToWidth(+width);
-      canvas!.add(fabricImage);
-      canvas!.setActiveObject(fabricImage);
+      canvas!.add(barcodeGroup);
+      // 设置不能旋转
+      barcodeGroup.setControlsVisibility({ mtr: false });
+
+      canvas!.setActiveObject(barcodeGroup);
       canvas!.requestRenderAll();
-      // 释放内存
-      URL.revokeObjectURL(url);
-    };
+    })
   } catch (e) {
     console.error(e);
   }
@@ -490,7 +462,7 @@ function addText() {
           <v-icon @click="isPanningMode = !isPanningMode">mdi-cursor-default-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
-          <v-icon @click="addBarcode('code128', '1234567890')">mdi-barcode</v-icon>
+          <v-icon @click="addBarcode('code128', '1234567213123890')">mdi-barcode</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
           <v-icon @click="addText">mdi-format-text</v-icon>
