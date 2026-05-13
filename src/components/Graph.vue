@@ -6,9 +6,9 @@ import {
   Ellipse,
   Textbox,
   Point,
+  Line,
   Group,
   Polyline,
-  Image as FabricImage,
   loadSVGFromString,
 } from 'fabric'; // browser
 import bwipjs from '@bwip-js/browser';
@@ -18,11 +18,9 @@ import {
   getLabelViewport,
   labelLocalToWorldPoint,
 } from '@/utils/coordinate';
-import { fa } from 'vuetify/locale';
 const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
-const imageRef = ref<HTMLImageElement | null>(null);
 let canvas: Canvas | null = null;
 let labelRect: Rect | null = null;
 const labelWidth = 3; //inch
@@ -48,7 +46,7 @@ function addBarcode(bcid = 'code128', text = '1234567890') {
       textxalign: 'center', // Always good to set this
     });
     // console.log('Generated SVG string:', svgString);
-    loadSVGFromString(svgString).then((red:any) => {
+    loadSVGFromString(svgString).then((red: any) => {
       console.log('Parsed SVG elements:', red);
       const barcodeGroup = new Group(red.objects, {
         left: 0,
@@ -59,6 +57,9 @@ function addBarcode(bcid = 'code128', text = '1234567890') {
       canvas!.add(barcodeGroup);
       // 设置不能旋转
       barcodeGroup.setControlsVisibility({ mtr: false });
+      barcodeGroup.set({ lockRotation: true });
+      // 设置不能缩放      
+      barcodeGroup.set({ lockScalingX: true, lockScalingY: true });
 
       canvas!.setActiveObject(barcodeGroup);
       canvas!.requestRenderAll();
@@ -83,7 +84,7 @@ function getNiceStep(target: number): number {
 function drawRulers() {
   if (!canvas || !labelRect) return;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext();
   if (!ctx) return;
 
   const width = canvas.getWidth();
@@ -309,7 +310,7 @@ onMounted(() => {
       const activeObjects = canvas!.getActiveObjects();
       if (activeObjects.length > 0) {
         canvas!.remove(...activeObjects);
-        canvas!.discardActiveObject().renderAll();
+        canvas!.discardActiveObject()
       }
     }
   });
@@ -345,7 +346,9 @@ function addRect() {
     top: 0,
     originX: 'left',
     originY: 'top',
-    fill: 'red',
+    fill: 'transparent',
+    stroke: 'black',
+    strokeWidth: 1,
     width: 100,
     height: 50,
   });
@@ -373,10 +376,10 @@ function addLine() {
   if (!canvas || !labelRect) return;
   const p1 = labelLocalToWorldPoint(10, 120, labelRect);
   const p2 = labelLocalToWorldPoint(150, 100, labelRect);
-  const polyline = new Polyline(
+  const polyline = new Line(
     [
-      { x: p1.x, y: p1.y },
-      { x: p2.x, y: p2.y }
+      p1.x, p1.y,
+      p2.x, p2.y
     ], {
     stroke: 'green',
     strokeWidth: 2,
@@ -520,7 +523,7 @@ function addText() {
 
     <!-- Main Canvas -->
     <v-main class="d-flex  align-center justify-center" style="background-color: #f0f0f0;">
-      <div class=" w-100 h-100 d-flex flex-column ">
+      <div class="w-100 h-100 d-flex flex-column">
         <div class="graph d-flex flex-column graph-wrap flex-grow-1" ref="graphContainerRef">
           <canvas ref="graphref"></canvas>
         </div>
@@ -541,46 +544,39 @@ function addText() {
   }
 }
 
-.graph-wrap {
-  width: 100%;
+.graph {
   height: calc(100% - 70px);
+}
 
-  .graph {
-    width: 100%;
+#property {
+  text-align: left;
+
+  .item {
+    display: flex;
+    margin: 20px 0px;
+
+    .label {
+      width: 70px;
+      text-indent: 10px;
+    }
+  }
+}
+
+.page-container {
+  // height: 880px;
+  background: #f0f2f5;
+
+  .tool-aside {
     height: 100%;
+    width: auto !important;
   }
 
-  #property {
-    text-align: left;
-
-    .item {
-      display: flex;
-      margin: 20px 0px;
-
-      .label {
-        width: 70px;
-        text-indent: 10px;
-      }
-    }
+  .tool-main {
+    padding: 0px;
   }
+}
 
-  .page-container {
-    // height: 880px;
-    background: #f0f2f5;
-
-    .tool-aside {
-      height: 100%;
-      width: auto !important;
-    }
-
-    .tool-main {
-      padding: 0px;
-    }
-  }
-
-  .hand {
-    cursor: url("~@/assets/hand.png"), auto !important;
-  }
-
+.hand {
+  cursor: url("~@/assets/hand.png"), auto !important;
 }
 </style>
