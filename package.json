@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bwip-js/browser": "^4.10.1",
     "@maxgraph/core": "^0.23.0",
     "@mdi/font": "^7.4.47",
     "fabric": "^7.3.1",

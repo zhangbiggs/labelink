@@ -8,16 +8,15 @@ import {
   Point,
   Polyline,
   Image as FabricImage,
-  util,
-  loadSVGFromString,
 } from 'fabric'; // browser
-import bwipjs from 'bwip-js';
+import bwipjs from '@bwip-js/browser';
 
 import {
   clientToLabelLocalPoint,
   getLabelViewport,
   labelLocalToWorldPoint,
 } from '@/utils/coordinate';
+import { fa } from 'vuetify/locale';
 const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
@@ -34,35 +33,64 @@ Ellipse.prototype.setControlsVisibility({ mtr: false });
 Polyline.prototype.setControlsVisibility({ mtr: false });
 Textbox.prototype.setControlsVisibility({ mtr: false });
 const isPanningMode = ref(false);
-function addBarcode() {
+function svgStringToImage(svgString: string) {
+  // 1. 将字符串解析为 DOM 对象，提取 viewBox
+  const parser = new DOMParser();
+  const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
+  const svgElement = svgDoc.querySelector("svg");
+
+  // 获取 viewBox: "x y width height"
+  const viewBox = svgElement?.getAttribute("viewBox");
+  let width = svgElement?.getAttribute("width");
+  let height = svgElement?.getAttribute("height");
+
+  if (viewBox && (!width || !height)) {
+    const parts = viewBox.split(/\s+/);
+    width = parts[2];  // viewBox 的宽度
+    height = parts[3]; // viewBox 的高度
+  }
+}
+function addBarcode(bcid = 'code128', text = '1234567890') {
   if (!canvas || !labelRect) return;
+  console.log('Adding barcode with text:', text);
   try {
     const svgString = bwipjs.toSVG({
-      bcid: 'code128', // Barcode type
-      text: '1234567890', // Text to encode
+      bcid: bcid, // Barcode type
+      text: text, // Text to encode
       scale: 1, // 3x scaling factor
       includetext: true, // Show human-readable text
       textxalign: 'center', // Always good to set this
     });
+    console.log('Generated SVG string:', svgString);
+    let [_, width, height] = /viewBox="0 0 (\d+) (\d+)"/.exec(svgString);
+    console.log(width, height)
     // 把svg 字符串转换成图片image，然后添加到canvas上，位置放在标签的左上角
-      const img = document.createElement('img');
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-      img.src = url;
-      imageRef.value!.src = url; // For debugging, show the generated SVG as an image
-      console.log('Generated SVG:', url);
-      img.onload = function() {
-        const fabricImage = new FabricImage(img, {
-          left: 0,
-          top: 0,
-          originX: 'left',    
-          originY: 'top',
-        });
-        canvas!.add(fabricImage);
-        canvas!.setActiveObject(fabricImage);
-        canvas!.requestRenderAll();
-        URL.revokeObjectURL(url);
-      };
+    const img = document.createElement('img');
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    img.src = url;
+    // img.width = +width;
+    // img.height = +height;
+    console.log(img.width, img.height);
+    imageRef.value!.src = url; // For debugging, show the generated SVG as an image
+    console.log('Generated SVG:', url);
+    img.onload = function () {
+      const fabricImage = new FabricImage(img, {
+        left: 0,
+        top: 0,
+        width: +width,
+        height: +height,
+        originX: 'left',
+        originY: 'top',
+      });
+      // fabricImage._setWidthHeight(+width, +height);
+      fabricImage.scaleToWidth(+width);
+      canvas!.add(fabricImage);
+      canvas!.setActiveObject(fabricImage);
+      canvas!.requestRenderAll();
+      // 释放内存
+      URL.revokeObjectURL(url);
+    };
   } catch (e) {
     console.error(e);
   }
@@ -449,7 +477,7 @@ function addText() {
 
       <v-btn-toggle rounded="0" dense>
         <v-btn>0°</v-btn>
-        <v-btn>90°</v-btn>
+        <v-btn @click="addBarcode('code128', '0234567890')">90°</v-btn>
         <v-btn>180°</v-btn>
         <v-btn>-90°</v-btn>
       </v-btn-toggle>
@@ -462,7 +490,7 @@ function addText() {
           <v-icon @click="isPanningMode = !isPanningMode">mdi-cursor-default-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
-          <v-icon @click="addBarcode">mdi-barcode</v-icon>
+          <v-icon @click="addBarcode('code128', '1234567890')">mdi-barcode</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
           <v-icon @click="addText">mdi-format-text</v-icon>
