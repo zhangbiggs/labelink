@@ -41,7 +41,6 @@ function addBarcode() {
       bcid: 'code128', // Barcode type
       text: '1234567890', // Text to encode
       scale: 1, // 3x scaling factor
-      height: 10, // Barcode height, in mm
       includetext: true, // Show human-readable text
       textxalign: 'center', // Always good to set this
     });
@@ -50,6 +49,7 @@ function addBarcode() {
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(svgBlob);
       img.src = url;
+      imageRef.value!.src = url; // For debugging, show the generated SVG as an image
       console.log('Generated SVG:', url);
       img.onload = function() {
         const fabricImage = new FabricImage(img, {
@@ -301,6 +301,17 @@ onMounted(() => {
 
   canvas.on('selection:cleared', () => {
     selectedObject.value = null;
+  });
+
+  // Add keyboard event listener for delete shortcut
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const activeObjects = canvas!.getActiveObjects();
+      if (activeObjects.length > 0) {
+        canvas!.remove(...activeObjects);
+        canvas!.discardActiveObject().renderAll();
+      }
+    }
   });
 
   autoZoomintoLabel();
