@@ -13,11 +13,20 @@ import {
 } from 'fabric'; // browser
 import bwipjs from '@bwip-js/browser';
 
-import {
-  clientToLabelLocalPoint,
-  getLabelViewport,
-  labelLocalToWorldPoint,
-} from '@/utils/coordinate';
+
+export type ViewportLike = {
+  zoom: number;
+  panX: number;
+  panY: number;
+};
+
+export type LabelRectLike = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
 const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
@@ -26,6 +35,7 @@ let labelRect: Rect | null = null;
 const labelWidth = 3; //inch
 const labelheight = 2; //inch
 const dpi = 200; // Standard screen DPI
+const paddingFactor = 0.7; // To add some padding around the label when zooming
 const selectedObject = ref<any>(null);
 const rulerThickness = 30;
 Rect.prototype.setControlsVisibility({ mtr: false });
@@ -234,25 +244,6 @@ onMounted(() => {
       isPanning = true;
       lastPosX = mouseEvent.clientX;
       lastPosY = mouseEvent.clientY;
-
-      const viewport = canvas?.viewportTransform
-        ? {
-          zoom: canvas.getZoom(),
-          panX: canvas.viewportTransform[4],
-          panY: canvas.viewportTransform[5],
-        }
-        : null;
-
-      if (viewport && labelRect && graphref.value) {
-        const localPoint = clientToLabelLocalPoint(
-          mouseEvent.clientX,
-          mouseEvent.clientY,
-          graphref.value,
-          viewport,
-          labelRect,
-        );
-        console.log('pointer local to label:', localPoint);
-      }
     }
   });
 
@@ -326,21 +317,19 @@ onBeforeUnmount(() => {
 function autoZoomintoLabel() {
   // 核心逻辑：不移动 labelRect，而是通过 setViewportTransform 平移视口
   if (!canvas || !labelRect) return;
-  const viewport = getLabelViewport(canvas.getWidth(), canvas.getHeight(), labelRect);
-  canvas.setViewportTransform([
-    viewport.zoom,
-    0,
-    0,
-    viewport.zoom,
-    viewport.panX,
-    viewport.panY,
-  ]);
+  const canvasWidth = canvas.getWidth();
+  const canvasHeight = canvas.getHeight();
+  const zoomX = canvasWidth / labelRect.width;
+  const zoomY = canvasHeight / labelRect.height;
+  const zoom = Math.min(zoomX, zoomY) * paddingFactor;
+  const panX = (canvasWidth - labelRect.width * zoom) / 2 - labelRect.left * zoom;
+  const panY = (canvasHeight - labelRect.height * zoom) / 2 - labelRect.top * zoom;
+  canvas.setViewportTransform([zoom, 0, 0, zoom, panX, panY]);
   canvas.requestRenderAll();
 }
 
 function addRect() {
   if (!canvas || !labelRect) return;
-  // const { x, y } = labelLocalToWorldPoint(labelRect.width / 2 - 100, labelRect.height / 2 - 50, labelRect);
   const rect = new Rect({
     left: 0,
     top: 0,
@@ -358,10 +347,9 @@ function addRect() {
 
 function addEllipse() {
   if (!canvas || !labelRect) return;
-  const { x, y } = labelLocalToWorldPoint(50, 50, labelRect);
   const ellipse = new Ellipse({
-    left: x,
-    top: y,
+    left: 0,
+    top: 0,
     originX: 'left',
     originY: 'top',
     fill: 'blue',
@@ -374,32 +362,29 @@ function addEllipse() {
 
 function addLine() {
   if (!canvas || !labelRect) return;
-  const p1 = labelLocalToWorldPoint(10, 120, labelRect);
-  const p2 = labelLocalToWorldPoint(150, 100, labelRect);
-  const polyline = new Line(
-    [
-      p1.x, p1.y,
-      p2.x, p2.y
-    ], {
-    stroke: 'green',
-    strokeWidth: 2,
-    fill: '',
-  });
-  canvas.add(polyline);
-  canvas.setActiveObject(polyline);
+  // const p1 = labelLocalToWorldPoint(10, 120, labelRect);
+  // const p2 = labelLocalToWorldPoint(150, 100, labelRect);
+  // const polyline = new Line(
+  //   [
+  //     p1.x, p1.y,
+  //     p2.x, p2.y
+  //   ], {
+  //   stroke: 'green',
+  //   strokeWidth: 2,
+  //   fill: '',
+  // });
+  // canvas.add(polyline);
+  // canvas.setActiveObject(polyline);
 }
 
 function addText() {
   if (!canvas || !labelRect) return;
-  const { x, y } = labelLocalToWorldPoint(10, 150, labelRect);
   const text = new Textbox('Hello, world!', {
-    left: x,
-    top: y,
+    left: 0,
+    top: 0,
     originX: 'left',
     originY: 'top',
-    width: 200,
     fill: 'black',
-
   });
   canvas.add(text);
   canvas.setActiveObject(text);
