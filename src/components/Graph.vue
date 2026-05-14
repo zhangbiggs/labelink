@@ -12,7 +12,7 @@ const panels = ref([
 
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
-
+const loadingStart = ref(false);
 let canvas: fabric.Canvas | null = null;
 let labelRect: fabric.Rect | null = null;
 
@@ -21,27 +21,81 @@ const labelheight = 2;
 const dpi = 200;
 const paddingFactor = 0.7;
 
-const selectedObject = ref<any>(null);
+const selectedObject = ref<fabric.FabricObject | null>(null);
 
 const rulerThickness = 30;
 
 const isPanningMode = ref(false);
 
-fabric.Rect.prototype.setControlsVisibility({
-  mtr: false,
-});
+function printSelectedObjectTable(object: fabric.FabricObject) {
+  if (!object) return;
+  console.table([
+    {
+      type: object.type,
+      width: object.width,
+      height: object.height,
+      left: object.left,
+      top: object.top,
+      originX: object.originX,
+      originY: object.originY,
+      scaleX: object.scaleX,
+      scaleY: object.scaleY,
+    },
+  ]);
+}
 
-fabric.Ellipse.prototype.setControlsVisibility({
-  mtr: false,
-});
+// // 撤销/前进历史记录
+// let history: string[] = [];
+// let historyStep = -1;
 
-fabric.Polyline.prototype.setControlsVisibility({
-  mtr: false,
-});
+// function saveCanvasState() {
+//   if (!canvas) return;
+//   if (loadingStart.value) return;
+//   console.log('Saving canvas state, current history length:', history.length);
+//   // 移除当前步骤之后的所有历史
+//   if (historyStep < history.length - 1) {
+//     history = history.slice(0, historyStep + 1);
+//   }
 
-fabric.Textbox.prototype.setControlsVisibility({
-  mtr: false,
-});
+//   // 保存当前状态
+//   const state = JSON.stringify(canvas.toJSON());
+//   history.push(state);
+//   historyStep = history.length - 1;
+// }
+
+// function undo() {
+//   if (!canvas || historyStep <= 0) return;
+
+//   historyStep--;
+//   loadCanvasState(history[historyStep]);
+// }
+
+// function redo() {
+//   if (!canvas || historyStep >= history.length - 1) return;
+
+//   historyStep++;
+//   loadCanvasState(history[historyStep]);
+// }
+
+// function loadCanvasState(state: string) {
+//   if (!canvas) return;
+//   if (loadingStart.value) return
+//   loadingStart.value = true;
+//   try {
+//     canvas.loadFromJSON(state, () => {
+//       canvas!.requestRenderAll();
+//     });
+//     loadingStart.value = false;
+//   } catch (e) {
+//     loadingStart.value = false;
+//     console.error('Failed to load canvas state:', e);
+//   }
+// }
+
+fabric.Rect.prototype.setControlsVisibility({ mtr: false, });
+fabric.Ellipse.prototype.setControlsVisibility({ mtr: false, });
+fabric.Polyline.prototype.setControlsVisibility({ mtr: false, });
+fabric.Textbox.prototype.setControlsVisibility({ mtr: false, });
 
 function addBarcode(
   bcid = 'code128',
@@ -121,11 +175,11 @@ function drawRulers() {
 
   ctx.fillStyle = '#f8f9fb';
 
-  ctx.fillRect( 0, 0, width, rulerThickness );
+  ctx.fillRect(0, 0, width, rulerThickness);
 
-  ctx.fillRect( 0, 0, rulerThickness, height );
+  ctx.fillRect(0, 0, rulerThickness, height);
 
-  ctx.fillRect( 0, 0, rulerThickness, rulerThickness );
+  ctx.fillRect(0, 0, rulerThickness, rulerThickness);
 
   const vpt = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
 
@@ -155,7 +209,7 @@ function drawRulers() {
 
   const endXWorld = (width - originX) / zoom;
 
-  const firstMinorX = Math.floor( startXWorld / minorStepWorld ) * minorStepWorld;
+  const firstMinorX = Math.floor(startXWorld / minorStepWorld) * minorStepWorld;
   for (
     let worldX = firstMinorX;
     worldX <= endXWorld;
@@ -172,23 +226,23 @@ function drawRulers() {
 
     const scaled = worldX / majorStepWorld;
 
-    const isMajor = Math.abs( scaled - Math.round(scaled) ) < 1e-6;
+    const isMajor = Math.abs(scaled - Math.round(scaled)) < 1e-6;
     ctx.beginPath();
 
     ctx.moveTo(screenX + 0.5, 0);
 
-    ctx.lineTo( screenX + 0.5, isMajor ? majorTick : minorTick );
+    ctx.lineTo(screenX + 0.5, isMajor ? majorTick : minorTick);
 
     ctx.stroke();
 
     if (isMajor) {
-      const label = Math.round( worldX ).toString();
+      const label = Math.round(worldX).toString();
 
       const textWidth = ctx.measureText(label).width;
 
       const textX = screenX - textWidth / 2;
 
-      ctx.fillText( label, textX, rulerThickness - 5 );
+      ctx.fillText(label, textX, rulerThickness - 5);
     }
   }
 
@@ -282,8 +336,11 @@ onMounted(() => {
     evented: false,
     hoverCursor: 'default',
   });
-
+  // labelRect 不可编辑
   canvas.add(labelRect);
+
+  // 保存初始状态
+  // saveCanvasState();
 
   let isPanning = false;
 
@@ -355,6 +412,7 @@ onMounted(() => {
 
       if (e.selected) {
         selectedObject.value = e.selected[0];
+        printSelectedObjectTable(selectedObject.value);
       }
     }
   );
@@ -366,6 +424,7 @@ onMounted(() => {
 
       if (e.selected) {
         selectedObject.value = e.selected[0];
+        printSelectedObjectTable(selectedObject.value);
       }
     }
   );
@@ -377,16 +436,35 @@ onMounted(() => {
     }
   );
 
+  // 监听对象修改、添加、移除事件以保存状态
+  // canvas.on('object:added', () => saveCanvasState());
+  // canvas.on('object:removed', () => saveCanvasState());
+  // canvas.on('object:modified', () => saveCanvasState());
+
   document.addEventListener(
     'keydown',
     (e) => {
+      // Ctrl+Z (Mac 为 Cmd+Z) - 撤销
+      // if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      //   e.preventDefault();
+      //   undo();
+      //   return;
+      // }
+
+      // // Ctrl+Y (Mac 为 Cmd+Y) 或 Ctrl+Shift+Z - 前进
+      // if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      //   e.preventDefault();
+      //   redo();
+      //   return;
+      // }
+
       if (
         e.key === 'Delete' ||
         e.key === 'Backspace'
       ) {
         const activeObjects = canvas!.getActiveObjects();
 
-        if ( activeObjects.length > 0 ) {
+        if (activeObjects.length > 0) {
           canvas!.remove(
             ...activeObjects
           );
@@ -415,7 +493,53 @@ onBeforeUnmount(() => {
     handleResize
   );
 });
+const originOffset = {
+  left: -0.5,
+  top: -0.5,
+  center: 0,
+  bottom: 0.5,
+  right: 0.5,
+};
+/**
+ * Resolves origin value relative to center
+ * @private
+ * @param {TOriginX | TOriginY} originValue originX / originY
+ * @returns number
+ */
+export type TOriginX = 'center' | 'left' | 'right' | number;
+export type TOriginY = 'center' | 'top' | 'bottom' | number;
+const resolveOrigin = (
+  originValue: TOriginX | TOriginY | number,
+): number =>
+  typeof originValue === 'string' ? originOffset[originValue] : originValue - 0.5;
 
+function resizeX(eventData: fabric.TPointerEvent, transform: fabric.Transform, x: number, y: number) {
+  const localPoint = fabric.controlsUtils.getLocalPoint(
+    transform,
+    transform.originX,
+    transform.originY,
+    x,
+    y,
+  );
+  const localPointValue = localPoint['x'];
+  //  make sure the control changes width ONLY from it's side of target
+  const originValue = resolveOrigin(transform[origin]);
+  if (
+    originValue === 0 ||
+    (originValue > 0 && localPointValue < 0) ||
+    (originValue < 0 && localPointValue > 0)
+  ) {
+    const { target } = transform,
+      strokePadding = target.strokeWidth / (target.strokeUniform ? target[scale] : 1),
+      multiplier = isTransformCentered(transform) ? 2 : 1,
+      oldWidth = target[dimension],
+      newWidth = Math.abs((localPointValue * multiplier) / target[scale]) - strokePadding;
+    target.set(dimension, Math.max(newWidth, 1));
+    //  check against actual target width in case `newWidth` was rejected
+    return oldWidth !== target[dimension];
+  }
+  return true;
+};
 function autoZoomintoLabel() {
   if (!canvas || !labelRect)
     return;
@@ -435,15 +559,43 @@ function autoZoomintoLabel() {
 
   const panY = (canvasHeight - labelRect.height! * zoom) / 2 - labelRect.top! * zoom;
 
-  canvas.setViewportTransform([ zoom, 0, 0, zoom, panX, panY, ]);
+  canvas.setViewportTransform([zoom, 0, 0, zoom, panX, panY,]);
   canvas.requestRenderAll();
 }
-function createResizeRect() {
+function customResizeHandler(eventData: fabric.TPointerEvent, transform: fabric.Transform, x: number, y: number) {
+  const { target, corner } = transform;
+  if (corner[0] === 'm') {
+    if (corner === 'ml' || corner === 'mr') {
+      fabric.controlsUtils.changeObjectWidth(eventData, transform, x, y);
+    } else if (corner === 'mt' || corner === 'mb') {
+      fabric.controlsUtils.changeObjectHeight(eventData, transform, x, y);
+    }
+    return true;
+  } else {
+    const isScaling = fabric.controlsUtils.scalingEqually(eventData, transform, x, y);
+    if (isScaling) {
+      const newWidth = target.width * target.scaleX;
+      const newHeight = target.height * target.scaleY;
+      // 3. 重置 scale 为 1，应用物理宽高
+      target.set({
+        width: newWidth,
+        height: newHeight,
+        scaleX: 1,
+        scaleY: 1,
+      });
+    }
+    return true;
+  }
+};
+function addRect() {
+  if (!canvas) return;
   const rect = new fabric.Rect({
     left: 100,
     top: 100,
     width: 100,
     height: 100,
+    originX: 'left',
+    originY: 'top',
     fill: 'transparent',
     stroke: 'black',
     strokeWidth: 2,
@@ -452,34 +604,16 @@ function createResizeRect() {
 
   // 获取 fabric 默认的控制点改变 Size 的处理函数
   // 'changeSize' 是 Fabric 内部专门用于 Textbox 这种只改宽度不改缩放的 action
-  const changeSizeAction = fabric.controlsUtils.changeObjectHeight;
+  // const changeSizeAction = fabric.controlsUtils.changeSize ;
+  // const changeSizeAction = fabric.controlsUtils.customResizeHandler ;
 
   // 针对矩形的 8个控制点，将 actionHandler 全部替换为修改尺寸
   const controlNames = ['tl', 'tr', 'br', 'bl', 'ml', 'mr', 'mt', 'mb'];
-  
   controlNames.forEach(controlName => {
-    rect.controls[controlName].actionHandler = changeSizeAction;
+    rect.controls[controlName].actionHandler = customResizeHandler
   });
 
   canvas.add(rect);
-}
-function addRect() {
-  if (!canvas) return;
-
-  const rect = new fabric.Rect({
-    left: 0,
-    top: 0,
-    originX: 'left',
-    originY: 'top',
-    fill: 'transparent',
-    stroke: 'black',
-    strokeWidth: 1,
-    width: 100,
-    height: 50,
-  });
-
-  canvas.add(rect);
-
   canvas.setActiveObject(rect);
 }
 
@@ -491,7 +625,7 @@ function addEllipse() {
     top: 0,
     originX: 'left',
     originY: 'top',
-    fill: 'blue',
+    fill: 'transparent',
     rx: 60,
     ry: 30,
   });
@@ -599,7 +733,7 @@ function addLine() {
           <v-icon>mdi-image-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
-          <v-icon @click="createResizeRect">mdi-rectangle-outline</v-icon>
+          <v-icon @click="addRect">mdi-rectangle-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
           <v-icon @click="addEllipse">mdi-circle-outline</v-icon>
