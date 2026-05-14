@@ -1,74 +1,105 @@
 <script lang="ts" setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import {
-  Canvas,
-  Rect,
-  Ellipse,
-  Textbox,
-  Point,
-  Line,
-  Group,
-  Polyline,
-  loadSVGFromString,
-} from 'fabric'; // browser
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import * as fabric from 'fabric';
 import bwipjs from '@bwip-js/browser';
+import { EditablePolyline } from '@/utils/StaLine';
+const panels = ref([
+  'dataSource',
+  'positionSize',
+  'printElement',
+  'barcodeSettings',
+]);
 
-
-const panels = ref(['dataSource', 'positionSize', 'printElement', 'barcodeSettings']);
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
-let canvas: Canvas | null = null;
-let labelRect: Rect | null = null;
-const labelWidth = 3; //inch
-const labelheight = 2; //inch
-const dpi = 200; // Standard screen DPI
-const paddingFactor = 0.7; // To add some padding around the label when zooming
+
+let canvas: fabric.Canvas | null = null;
+let labelRect: fabric.Rect | null = null;
+
+const labelWidth = 3;
+const labelheight = 2;
+const dpi = 200;
+const paddingFactor = 0.7;
+
 const selectedObject = ref<any>(null);
+
 const rulerThickness = 30;
-Rect.prototype.setControlsVisibility({ mtr: false });
-Ellipse.prototype.setControlsVisibility({ mtr: false });
-Polyline.prototype.setControlsVisibility({ mtr: false });
-Textbox.prototype.setControlsVisibility({ mtr: false });
+
 const isPanningMode = ref(false);
 
-function addBarcode(bcid = 'code128', text = '1234567890') {
+fabric.Rect.prototype.setControlsVisibility({
+  mtr: false,
+});
+
+fabric.Ellipse.prototype.setControlsVisibility({
+  mtr: false,
+});
+
+fabric.Polyline.prototype.setControlsVisibility({
+  mtr: false,
+});
+
+fabric.Textbox.prototype.setControlsVisibility({
+  mtr: false,
+});
+
+function addBarcode(
+  bcid = 'code128',
+  text = '1234567890'
+) {
   if (!canvas || !labelRect) return;
-  console.log('Adding barcode with text:', text);
+
   try {
     const svgString = bwipjs.toSVG({
-      bcid: bcid, // Barcode type
-      text: text, // Text to encode
-      scale: 1, // 3x scaling factor
-      includetext: true, // Show human-readable text
-      textxalign: 'center', // Always good to set this
+      bcid,
+      text,
+      scale: 1,
+      includetext: true,
+      textxalign: 'center',
     });
-    // console.log('Generated SVG string:', svgString);
-    loadSVGFromString(svgString).then((red: any) => {
-      console.log('Parsed SVG elements:', red);
-      const barcodeGroup = new Group(red.objects, {
-        left: 0,
-        top: 0,
-        originX: 'left',
-        originY: 'top',
-      });
-      canvas!.add(barcodeGroup);
-      // 设置不能旋转
-      barcodeGroup.setControlsVisibility({ mtr: false });
-      barcodeGroup.set({ lockRotation: true });
-      // 设置不能缩放      
-      barcodeGroup.set({ lockScalingX: true, lockScalingY: true });
 
-      canvas!.setActiveObject(barcodeGroup);
-      canvas!.requestRenderAll();
-    })
+    fabric
+      .loadSVGFromString(svgString)
+      .then((res: any) => {
+        const barcodeGroup = new fabric.Group(
+          res.objects,
+          {
+            left: 0,
+            top: 0,
+            originX: 'left',
+            originY: 'top',
+          }
+        );
+
+        canvas!.add(barcodeGroup);
+
+        barcodeGroup.setControlsVisibility({
+          mtr: false,
+        });
+
+        barcodeGroup.set({
+          lockRotation: true,
+          lockScalingX: true,
+          lockScalingY: true,
+        });
+
+        canvas!.setActiveObject(barcodeGroup);
+
+        canvas!.requestRenderAll();
+      });
   } catch (e) {
     console.error(e);
   }
 }
+
 function getNiceStep(target: number): number {
   if (target <= 0) return 1;
 
-  const power = Math.pow(10, Math.floor(Math.log10(target)));
+  const power = Math.pow(
+    10,
+    Math.floor(Math.log10(target))
+  );
+
   const fraction = target / power;
 
   if (fraction <= 1) return power;
@@ -82,93 +113,200 @@ function drawRulers() {
   if (!canvas || !labelRect) return;
 
   const ctx = canvas.getContext();
+
   if (!ctx) return;
 
   const width = canvas.getWidth();
   const height = canvas.getHeight();
 
-  // Draw ruler backgrounds
   ctx.fillStyle = '#f8f9fb';
-  ctx.fillRect(0, 0, width, rulerThickness); // X ruler background
-  ctx.fillRect(0, 0, rulerThickness, height); // Y ruler background
-  ctx.fillRect(0, 0, rulerThickness, rulerThickness); // Ruler corner background
 
-  const vpt = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+  ctx.fillRect(
+    0,
+    0,
+    width,
+    rulerThickness
+  );
+
+  ctx.fillRect(
+    0,
+    0,
+    rulerThickness,
+    height
+  );
+
+  ctx.fillRect(
+    0,
+    0,
+    rulerThickness,
+    rulerThickness
+  );
+
+  const vpt =
+    canvas.viewportTransform ??
+    [1, 0, 0, 1, 0, 0];
+
   const zoom = canvas.getZoom();
+
   const tx = vpt[4] ?? 0;
   const ty = vpt[5] ?? 0;
 
-  // The screen coordinates of the world origin (0,0)
-  // Since labelRect is at (0,0) and its origin is top-left, this is the screen position of labelRect's top-left.
   const originX = tx;
   const originY = ty;
 
-  const majorStepWorld = getNiceStep(100 / zoom);
-  const minorStepWorld = majorStepWorld / 10;
+  const majorStepWorld =
+    getNiceStep(100 / zoom);
+
+  const minorStepWorld =
+    majorStepWorld / 10;
 
   const minorTick = 5;
   const majorTick = 10;
 
-  ctx.strokeStyle = '#00000';
+  ctx.strokeStyle = '#000';
   ctx.fillStyle = '#36404a';
   ctx.lineWidth = 1;
   ctx.font = '14px sans-serif';
 
-  // X-Ruler
-  // Calculate the world coordinates visible on the screen
-  const startXWorld = (0 - originX) / zoom;
-  const endXWorld = (width - originX) / zoom;
-  const firstMinorX = Math.floor(startXWorld / minorStepWorld) * minorStepWorld;
+  // X ruler
 
-  for (let worldX = firstMinorX; worldX <= endXWorld; worldX += minorStepWorld) {
-    const screenX = originX + worldX * zoom;
-    // Only draw if the tick is within the visible canvas width
-    if (screenX < 0 || screenX > width) continue;
+  const startXWorld =
+    (0 - originX) / zoom;
 
-    const scaled = worldX / majorStepWorld;
-    const isMajor = Math.abs(scaled - Math.round(scaled)) < 1e-6;
+  const endXWorld =
+    (width - originX) / zoom;
+
+  const firstMinorX =
+    Math.floor(
+      startXWorld / minorStepWorld
+    ) * minorStepWorld;
+
+  for (
+    let worldX = firstMinorX;
+    worldX <= endXWorld;
+    worldX += minorStepWorld
+  ) {
+    const screenX =
+      originX + worldX * zoom;
+
+    if (
+      screenX < 0 ||
+      screenX > width
+    ) {
+      continue;
+    }
+
+    const scaled =
+      worldX / majorStepWorld;
+
+    const isMajor =
+      Math.abs(
+        scaled - Math.round(scaled)
+      ) < 1e-6;
 
     ctx.beginPath();
-    // Draw tick from top of ruler (0) down to tick length
+
     ctx.moveTo(screenX + 0.5, 0);
-    ctx.lineTo(screenX + 0.5, (isMajor ? majorTick : minorTick));
+
+    ctx.lineTo(
+      screenX + 0.5,
+      isMajor
+        ? majorTick
+        : minorTick
+    );
+
     ctx.stroke();
 
     if (isMajor) {
-      const textWidth = ctx.measureText(Math.round(worldX).toString()).width;
-      let textX = screenX - textWidth / 2;
-      ctx.fillText(Math.round(worldX).toString(), textX, rulerThickness - 5);
+      const label = Math.round(
+        worldX
+      ).toString();
+
+      const textWidth =
+        ctx.measureText(label).width;
+
+      const textX =
+        screenX - textWidth / 2;
+
+      ctx.fillText(
+        label,
+        textX,
+        rulerThickness - 5
+      );
     }
   }
 
-  // Y-Ruler
-  const startYWorld = (0 - originY) / zoom;
-  const endYWorld = (height - originY) / zoom;
-  const firstMinorY = Math.floor(startYWorld / minorStepWorld) * minorStepWorld;
+  // Y ruler
 
-  for (let worldY = firstMinorY; worldY <= endYWorld; worldY += minorStepWorld) {
-    const screenY = originY + worldY * zoom;
-    // Only draw if the tick is within the visible canvas height
-    if (screenY < 0 || screenY > height) continue;
+  const startYWorld =
+    (0 - originY) / zoom;
 
-    const scaled = worldY / majorStepWorld;
-    const isMajor = Math.abs(scaled - Math.round(scaled)) < 1e-6;
+  const endYWorld =
+    (height - originY) / zoom;
+
+  const firstMinorY =
+    Math.floor(
+      startYWorld / minorStepWorld
+    ) * minorStepWorld;
+
+  for (
+    let worldY = firstMinorY;
+    worldY <= endYWorld;
+    worldY += minorStepWorld
+  ) {
+    const screenY =
+      originY + worldY * zoom;
+
+    if (
+      screenY < 0 ||
+      screenY > height
+    ) {
+      continue;
+    }
+
+    const scaled =
+      worldY / majorStepWorld;
+
+    const isMajor =
+      Math.abs(
+        scaled - Math.round(scaled)
+      ) < 1e-6;
 
     ctx.beginPath();
-    // Draw tick from left of ruler (0) right to tick length
+
     ctx.moveTo(0, screenY + 0.5);
-    ctx.lineTo((isMajor ? majorTick : minorTick), screenY + 0.5);
+
+    ctx.lineTo(
+      isMajor
+        ? majorTick
+        : minorTick,
+      screenY + 0.5
+    );
+
     ctx.stroke();
 
     if (isMajor) {
-      const label = Math.round(worldY).toString();
+      const label = Math.round(
+        worldY
+      ).toString();
+
       ctx.save();
-       const textWidth = ctx.measureText(Math.round(worldY).toString()).width;
-      let textX = screenY + textWidth / 2;
-      // Translate to position for text, rotate, then draw
-      ctx.translate(rulerThickness - 5, textX); // Adjusted X position
+
+      const textWidth =
+        ctx.measureText(label).width;
+
+      const textX =
+        screenY + textWidth / 2;
+
+      ctx.translate(
+        rulerThickness - 5,
+        textX
+      );
+
       ctx.rotate(-Math.PI / 2);
+
       ctx.fillText(label, 0, 0);
+
       ctx.restore();
     }
   }
@@ -176,39 +314,60 @@ function drawRulers() {
 
 function handleResize() {
   const canvasEl = graphref.value;
-  const containerEl = graphContainerRef.value;
-  if (!canvas || !canvasEl || !containerEl) {
+  const containerEl =
+    graphContainerRef.value;
+
+  if (
+    !canvas ||
+    !canvasEl ||
+    !containerEl
+  ) {
     return;
   }
 
-  canvasEl.width = containerEl.clientWidth;
-  canvasEl.height = containerEl.clientHeight;
+  canvasEl.width =
+    containerEl.clientWidth;
+
+  canvasEl.height =
+    containerEl.clientHeight;
+
   canvas.setDimensions({
     width: canvasEl.width,
     height: canvasEl.height,
   });
 
-  // 窗口调整时，通过调整视口来保持标签居中
   autoZoomintoLabel();
 }
 
 onMounted(() => {
   const canvasEl = graphref.value;
-  const containerEl = graphContainerRef.value;
 
-  if (!canvasEl || !containerEl) {
+  const containerEl =
+    graphContainerRef.value;
+
+  if (
+    !canvasEl ||
+    !containerEl
+  ) {
     return;
   }
-  // Set canvas dimensions to match its container
-  canvasEl.width = containerEl.clientWidth;
-  canvasEl.height = containerEl.clientHeight;
 
-  canvas = new Canvas(canvasEl);
+  canvasEl.width =
+    containerEl.clientWidth;
 
-  console.log(canvas.getWidth(), canvas.getHeight());
-  canvas.on('after:render', drawRulers); // Attach ruler drawing to after:render event
-  // 标签矩形固定在 (0,0)，作为局部坐标系的起点
-  labelRect = new Rect({
+  canvasEl.height =
+    containerEl.clientHeight;
+
+  canvas = new fabric.Canvas(
+    canvasEl
+  );
+
+  canvas.on(
+    'after:render',
+    drawRulers
+  );
+
+  labelRect = new fabric.Rect({
     left: 0,
     top: 0,
     originX: 'left',
@@ -219,108 +378,221 @@ onMounted(() => {
     stroke: '#ccc',
     strokeDashArray: [5, 5],
     selectable: false,
-    evented: false, // Makes the rectangle non-interactive
+    evented: false,
     hoverCursor: 'default',
   });
 
   canvas.add(labelRect);
-  // canvas.clipPath = labelRect;
+
   let isPanning = false;
-  let lastPosX: number, lastPosY: number;
 
-  canvas.on('mouse:down', function (opt) {
-    const mouseEvent = opt.e as MouseEvent;
-    if (mouseEvent.altKey || isPanningMode.value) {
-      isPanning = true;
-      lastPosX = mouseEvent.clientX;
-      lastPosY = mouseEvent.clientY;
+  let lastPosX = 0;
+  let lastPosY = 0;
+
+  canvas.on(
+    'mouse:down',
+    (opt) => {
+      const e =
+        opt.e as MouseEvent;
+
+      if (
+        e.altKey ||
+        isPanningMode.value
+      ) {
+        isPanning = true;
+
+        lastPosX = e.clientX;
+        lastPosY = e.clientY;
+      }
     }
-  });
+  );
 
-  canvas.on('mouse:move', (opt) => {
-    if (isPanning) {
-      const e = opt.e as MouseEvent;
-      const vpt = canvas!.viewportTransform!;
-      vpt[4] += e.clientX - lastPosX;
-      vpt[5] += e.clientY - lastPosY;
+  canvas.on(
+    'mouse:move',
+    (opt) => {
+      if (!isPanning) return;
+
+      const e =
+        opt.e as MouseEvent;
+
+      const vpt =
+        canvas!.viewportTransform!;
+
+      vpt[4] +=
+        e.clientX - lastPosX;
+
+      vpt[5] +=
+        e.clientY - lastPosY;
+
       canvas!.requestRenderAll();
+
       lastPosX = e.clientX;
       lastPosY = e.clientY;
     }
-  });
+  );
 
-  canvas.on('mouse:up', function () {
+  canvas.on('mouse:up', () => {
     isPanning = false;
   });
-  canvas.on('mouse:wheel', function (opt) {
-    const delta = opt.e.deltaY;
-    const x = opt.e.offsetX;
-    const y = opt.e.offsetY;
-    let zoom = canvas!.getZoom();
-    zoom *= 0.999 ** delta;
-    if (zoom > 20) zoom = 20;
-    if (zoom < 0.01) zoom = 0.01;
-    canvas!.zoomToPoint(new Point(x, y), zoom);
-    opt.e.preventDefault();
-    opt.e.stopPropagation();
-  });
 
-  canvas.requestRenderAll();
-  addRect();
-  canvas.on('selection:created', (e) => {
-    isPanningMode.value = false;
-    if (e.selected) {
-      selectedObject.value = e.selected[0];
+  canvas.on(
+    'mouse:wheel',
+    (opt) => {
+      const delta =
+        opt.e.deltaY;
+
+      const x =
+        opt.e.offsetX;
+
+      const y =
+        opt.e.offsetY;
+
+      let zoom =
+        canvas!.getZoom();
+
+      zoom *= 0.999 ** delta;
+
+      if (zoom > 20)
+        zoom = 20;
+
+      if (zoom < 0.01)
+        zoom = 0.01;
+
+      canvas!.zoomToPoint(
+        new fabric.Point(x, y),
+        zoom
+      );
+
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
     }
-  });
+  );
 
-  canvas.on('selection:updated', (e) => {
-    isPanningMode.value = false;
-    if (e.selected) {
-      selectedObject.value = e.selected[0];
-    }
-  });
+  canvas.on(
+    'selection:created',
+    (e) => {
+      isPanningMode.value =
+        false;
 
-  canvas.on('selection:cleared', () => {
-    selectedObject.value = null;
-  });
-
-  // Add keyboard event listener for delete shortcut
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      const activeObjects = canvas!.getActiveObjects();
-      if (activeObjects.length > 0) {
-        canvas!.remove(...activeObjects);
-        canvas!.discardActiveObject()
+      if (e.selected) {
+        selectedObject.value =
+          e.selected[0];
       }
     }
-  });
+  );
+
+  canvas.on(
+    'selection:updated',
+    (e) => {
+      isPanningMode.value =
+        false;
+
+      if (e.selected) {
+        selectedObject.value =
+          e.selected[0];
+      }
+    }
+  );
+
+  canvas.on(
+    'selection:cleared',
+    () => {
+      selectedObject.value =
+        null;
+    }
+  );
+
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (
+        e.key === 'Delete' ||
+        e.key === 'Backspace'
+      ) {
+        const activeObjects =
+          canvas!.getActiveObjects();
+
+        if (
+          activeObjects.length > 0
+        ) {
+          canvas!.remove(
+            ...activeObjects
+          );
+
+          canvas!.discardActiveObject();
+
+          canvas!.requestRenderAll();
+        }
+      }
+    }
+  );
+
+  addRect();
 
   autoZoomintoLabel();
-  window.addEventListener('resize', handleResize);
+
+  window.addEventListener(
+    'resize',
+    handleResize
+  );
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize);
+  window.removeEventListener(
+    'resize',
+    handleResize
+  );
 });
 
 function autoZoomintoLabel() {
-  // 核心逻辑：不移动 labelRect，而是通过 setViewportTransform 平移视口
-  if (!canvas || !labelRect) return;
-  const canvasWidth = canvas.getWidth();
-  const canvasHeight = canvas.getHeight();
-  const zoomX = canvasWidth / labelRect.width;
-  const zoomY = canvasHeight / labelRect.height;
-  const zoom = Math.min(zoomX, zoomY) * paddingFactor;
-  const panX = (canvasWidth - labelRect.width * zoom) / 2 - labelRect.left * zoom;
-  const panY = (canvasHeight - labelRect.height * zoom) / 2 - labelRect.top * zoom;
-  canvas.setViewportTransform([zoom, 0, 0, zoom, panX, panY]);
+  if (!canvas || !labelRect)
+    return;
+
+  const canvasWidth =
+    canvas.getWidth();
+
+  const canvasHeight =
+    canvas.getHeight();
+
+  const zoomX =
+    canvasWidth / labelRect.width!;
+
+  const zoomY =
+    canvasHeight /
+    labelRect.height!;
+
+  const zoom =
+    Math.min(zoomX, zoomY) *
+    paddingFactor;
+
+  const panX =
+    (canvasWidth -
+      labelRect.width! * zoom) /
+    2 -
+    labelRect.left! * zoom;
+
+  const panY =
+    (canvasHeight -
+      labelRect.height! * zoom) /
+    2 -
+    labelRect.top! * zoom;
+
+  canvas.setViewportTransform([
+    zoom,
+    0,
+    0,
+    zoom,
+    panX,
+    panY,
+  ]);
+
   canvas.requestRenderAll();
 }
 
 function addRect() {
-  if (!canvas || !labelRect) return;
-  const rect = new Rect({
+  if (!canvas) return;
+
+  const rect = new fabric.Rect({
     left: 0,
     top: 0,
     originX: 'left',
@@ -331,65 +603,71 @@ function addRect() {
     width: 100,
     height: 50,
   });
+
   canvas.add(rect);
+
   canvas.setActiveObject(rect);
 }
 
 function addEllipse() {
-  if (!canvas || !labelRect) return;
-  const ellipse = new Ellipse({
-    left: 0,
-    top: 0,
-    originX: 'left',
-    originY: 'top',
-    fill: 'blue',
-    rx: 60,
-    ry: 30,
-  });
-  canvas.add(ellipse);
-  canvas.setActiveObject(ellipse);
-}
+  if (!canvas) return;
 
-function addLine() {
-  if (!canvas || !labelRect) return;
-  // const p1 = labelLocalToWorldPoint(10, 120, labelRect);
-  // const p2 = labelLocalToWorldPoint(150, 100, labelRect);
-  // const polyline = new Line(
-  //   [
-  //     p1.x, p1.y,
-  //     p2.x, p2.y
-  //   ], {
-  //   stroke: 'green',
-  //   strokeWidth: 2,
-  //   fill: '',
-  // });
-  // canvas.add(polyline);
-  // canvas.setActiveObject(polyline);
+  const ellipse =
+    new fabric.Ellipse({
+      left: 0,
+      top: 0,
+      originX: 'left',
+      originY: 'top',
+      fill: 'blue',
+      rx: 60,
+      ry: 30,
+    });
+
+  canvas.add(ellipse);
+
+  canvas.setActiveObject(
+    ellipse
+  );
 }
 
 function addText() {
-  if (!canvas || !labelRect) return;
-  const text = new Textbox('Hello, world!', {
-    left: 0,
-    top: 0,
-    originX: 'left',
-    originY: 'top',
-    fill: 'black',
-  });
+  if (!canvas) return;
+
+  const text =
+    new fabric.Textbox(
+      'Hello, world!',
+      {
+        left: 0,
+        top: 0,
+        originX: 'left',
+        originY: 'top',
+        fill: 'black',
+      }
+    );
+
   canvas.add(text);
+
   canvas.setActiveObject(text);
+
   canvas.requestRenderAll();
 }
 
-// function clearCanvas() {
-//   if (!canvas || !labelRect) return;
-//   canvas.getObjects().forEach((obj) => {
-//     if (obj !== labelRect) {
-//       canvas!.remove(obj);
-//     }
-//   });
-//   canvas.requestRenderAll();
-// }
+function addLine() {
+  if (!canvas) return;
+
+  const line = new EditablePolyline([
+    new fabric.Point({ x: 0, y: 0 }),
+    new fabric.Point({ x: 100, y: 100 })
+  ], {
+    stroke: 'black',
+    strokeWidth: 2
+  });
+
+  canvas.add(line);
+
+  canvas.setActiveObject(line);
+}
+
 </script>
 
 <template>
