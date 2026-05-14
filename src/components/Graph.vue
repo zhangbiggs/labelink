@@ -121,30 +121,13 @@ function drawRulers() {
 
   ctx.fillStyle = '#f8f9fb';
 
-  ctx.fillRect(
-    0,
-    0,
-    width,
-    rulerThickness
-  );
+  ctx.fillRect( 0, 0, width, rulerThickness );
 
-  ctx.fillRect(
-    0,
-    0,
-    rulerThickness,
-    height
-  );
+  ctx.fillRect( 0, 0, rulerThickness, height );
 
-  ctx.fillRect(
-    0,
-    0,
-    rulerThickness,
-    rulerThickness
-  );
+  ctx.fillRect( 0, 0, rulerThickness, rulerThickness );
 
-  const vpt =
-    canvas.viewportTransform ??
-    [1, 0, 0, 1, 0, 0];
+  const vpt = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
 
   const zoom = canvas.getZoom();
 
@@ -154,11 +137,9 @@ function drawRulers() {
   const originX = tx;
   const originY = ty;
 
-  const majorStepWorld =
-    getNiceStep(100 / zoom);
+  const majorStepWorld = getNiceStep(100 / zoom);
 
-  const minorStepWorld =
-    majorStepWorld / 10;
+  const minorStepWorld = majorStepWorld / 10;
 
   const minorTick = 5;
   const majorTick = 10;
@@ -170,24 +151,17 @@ function drawRulers() {
 
   // X ruler
 
-  const startXWorld =
-    (0 - originX) / zoom;
+  const startXWorld = (0 - originX) / zoom;
 
-  const endXWorld =
-    (width - originX) / zoom;
+  const endXWorld = (width - originX) / zoom;
 
-  const firstMinorX =
-    Math.floor(
-      startXWorld / minorStepWorld
-    ) * minorStepWorld;
-
+  const firstMinorX = Math.floor( startXWorld / minorStepWorld ) * minorStepWorld;
   for (
     let worldX = firstMinorX;
     worldX <= endXWorld;
     worldX += minorStepWorld
   ) {
-    const screenX =
-      originX + worldX * zoom;
+    const screenX = originX + worldX * zoom;
 
     if (
       screenX < 0 ||
@@ -196,112 +170,61 @@ function drawRulers() {
       continue;
     }
 
-    const scaled =
-      worldX / majorStepWorld;
+    const scaled = worldX / majorStepWorld;
 
-    const isMajor =
-      Math.abs(
-        scaled - Math.round(scaled)
-      ) < 1e-6;
-
+    const isMajor = Math.abs( scaled - Math.round(scaled) ) < 1e-6;
     ctx.beginPath();
 
     ctx.moveTo(screenX + 0.5, 0);
 
-    ctx.lineTo(
-      screenX + 0.5,
-      isMajor
-        ? majorTick
-        : minorTick
-    );
+    ctx.lineTo( screenX + 0.5, isMajor ? majorTick : minorTick );
 
     ctx.stroke();
 
     if (isMajor) {
-      const label = Math.round(
-        worldX
-      ).toString();
+      const label = Math.round( worldX ).toString();
 
-      const textWidth =
-        ctx.measureText(label).width;
+      const textWidth = ctx.measureText(label).width;
 
-      const textX =
-        screenX - textWidth / 2;
+      const textX = screenX - textWidth / 2;
 
-      ctx.fillText(
-        label,
-        textX,
-        rulerThickness - 5
-      );
+      ctx.fillText( label, textX, rulerThickness - 5 );
     }
   }
 
   // Y ruler
 
-  const startYWorld =
-    (0 - originY) / zoom;
-
-  const endYWorld =
-    (height - originY) / zoom;
-
-  const firstMinorY =
-    Math.floor(
-      startYWorld / minorStepWorld
-    ) * minorStepWorld;
-
+  const startYWorld = (0 - originY) / zoom;
+  const endYWorld = (height - originY) / zoom;
+  const firstMinorY = Math.floor(startYWorld / minorStepWorld) * minorStepWorld;
   for (
     let worldY = firstMinorY;
     worldY <= endYWorld;
     worldY += minorStepWorld
   ) {
-    const screenY =
-      originY + worldY * zoom;
+    const screenY = originY + worldY * zoom;
+    if (screenY < 0 || screenY > height) { continue; }
 
-    if (
-      screenY < 0 ||
-      screenY > height
-    ) {
-      continue;
-    }
-
-    const scaled =
-      worldY / majorStepWorld;
-
-    const isMajor =
-      Math.abs(
-        scaled - Math.round(scaled)
-      ) < 1e-6;
+    const scaled = worldY / majorStepWorld;
+    const isMajor = Math.abs(scaled - Math.round(scaled)) < 1e-6;
 
     ctx.beginPath();
 
     ctx.moveTo(0, screenY + 0.5);
 
-    ctx.lineTo(
-      isMajor
-        ? majorTick
-        : minorTick,
-      screenY + 0.5
-    );
+    ctx.lineTo(isMajor ? majorTick : minorTick, screenY + 0.5);
 
     ctx.stroke();
 
     if (isMajor) {
-      const label = Math.round(
-        worldY
-      ).toString();
-
+      const label = Math.round(worldY).toString();
       ctx.save();
 
-      const textWidth =
-        ctx.measureText(label).width;
+      const textWidth = ctx.measureText(label).width;
 
-      const textX =
-        screenY + textWidth / 2;
+      const textX = screenY + textWidth / 2;
 
-      ctx.translate(
-        rulerThickness - 5,
-        textX
-      );
+      ctx.translate(rulerThickness - 5, textX);
 
       ctx.rotate(-Math.PI / 2);
 
@@ -314,22 +237,13 @@ function drawRulers() {
 
 function handleResize() {
   const canvasEl = graphref.value;
-  const containerEl =
-    graphContainerRef.value;
+  const containerEl = graphContainerRef.value;
 
-  if (
-    !canvas ||
-    !canvasEl ||
-    !containerEl
-  ) {
-    return;
-  }
+  if (!canvas || !canvasEl || !containerEl) { return; }
 
-  canvasEl.width =
-    containerEl.clientWidth;
+  canvasEl.width = containerEl.clientWidth;
 
-  canvasEl.height =
-    containerEl.clientHeight;
+  canvasEl.height = containerEl.clientHeight;
 
   canvas.setDimensions({
     width: canvasEl.width,
@@ -342,30 +256,17 @@ function handleResize() {
 onMounted(() => {
   const canvasEl = graphref.value;
 
-  const containerEl =
-    graphContainerRef.value;
+  const containerEl = graphContainerRef.value;
 
-  if (
-    !canvasEl ||
-    !containerEl
-  ) {
-    return;
-  }
+  if (!canvasEl || !containerEl) { return; }
 
-  canvasEl.width =
-    containerEl.clientWidth;
+  canvasEl.width = containerEl.clientWidth;
 
-  canvasEl.height =
-    containerEl.clientHeight;
+  canvasEl.height = containerEl.clientHeight;
 
-  canvas = new fabric.Canvas(
-    canvasEl
-  );
+  canvas = new fabric.Canvas(canvasEl);
 
-  canvas.on(
-    'after:render',
-    drawRulers
-  );
+  canvas.on('after:render', drawRulers);
 
   labelRect = new fabric.Rect({
     left: 0,
@@ -389,94 +290,71 @@ onMounted(() => {
   let lastPosX = 0;
   let lastPosY = 0;
 
-  canvas.on(
-    'mouse:down',
-    (opt) => {
-      const e =
-        opt.e as MouseEvent;
+  canvas.on('mouse:down', (opt) => {
+    const e = opt.e as MouseEvent;
 
-      if (
-        e.altKey ||
-        isPanningMode.value
-      ) {
-        isPanning = true;
-
-        lastPosX = e.clientX;
-        lastPosY = e.clientY;
-      }
-    }
-  );
-
-  canvas.on(
-    'mouse:move',
-    (opt) => {
-      if (!isPanning) return;
-
-      const e =
-        opt.e as MouseEvent;
-
-      const vpt =
-        canvas!.viewportTransform!;
-
-      vpt[4] +=
-        e.clientX - lastPosX;
-
-      vpt[5] +=
-        e.clientY - lastPosY;
-
-      canvas!.requestRenderAll();
+    if (e.altKey || isPanningMode.value) {
+      isPanning = true;
 
       lastPosX = e.clientX;
       lastPosY = e.clientY;
     }
+  }
+  );
+
+  canvas.on('mouse:move', (opt) => {
+    if (!isPanning) return;
+
+    const e = opt.e as MouseEvent;
+
+    const vpt = canvas!.viewportTransform!;
+
+    vpt[4] += e.clientX - lastPosX;
+
+    vpt[5] += e.clientY - lastPosY;
+
+    canvas!.requestRenderAll();
+
+    lastPosX = e.clientX;
+    lastPosY = e.clientY;
+  }
   );
 
   canvas.on('mouse:up', () => {
     isPanning = false;
   });
 
-  canvas.on(
-    'mouse:wheel',
-    (opt) => {
-      const delta =
-        opt.e.deltaY;
+  canvas.on('mouse:wheel', (opt) => {
+    const delta = opt.e.deltaY;
 
-      const x =
-        opt.e.offsetX;
+    const x = opt.e.offsetX;
 
-      const y =
-        opt.e.offsetY;
+    const y = opt.e.offsetY;
 
-      let zoom =
-        canvas!.getZoom();
+    let zoom = canvas!.getZoom();
 
-      zoom *= 0.999 ** delta;
+    zoom *= 0.999 ** delta;
 
-      if (zoom > 20)
-        zoom = 20;
+    if (zoom > 20)
+      zoom = 20;
 
-      if (zoom < 0.01)
-        zoom = 0.01;
+    if (zoom < 0.01)
+      zoom = 0.01;
 
-      canvas!.zoomToPoint(
-        new fabric.Point(x, y),
-        zoom
-      );
+    canvas!.zoomToPoint(new fabric.Point(x, y), zoom);
 
-      opt.e.preventDefault();
-      opt.e.stopPropagation();
-    }
+    opt.e.preventDefault();
+    opt.e.stopPropagation();
+  }
   );
 
   canvas.on(
     'selection:created',
     (e) => {
-      isPanningMode.value =
-        false;
+      isPanningMode.value = false;
 
       if (e.selected) {
-        selectedObject.value =
-          e.selected[0];
+        selectedObject.value = e.selected[0];
       }
     }
   );
@@ -484,12 +362,10 @@ onMounted(() => {
   canvas.on(
     'selection:updated',
     (e) => {
-      isPanningMode.value =
-        false;
+      isPanningMode.value = false;
 
       if (e.selected) {
-        selectedObject.value =
-          e.selected[0];
+        selectedObject.value = e.selected[0];
       }
     }
   );
@@ -497,8 +373,7 @@ onMounted(() => {
   canvas.on(
     'selection:cleared',
     () => {
-      selectedObject.value =
-        null;
+      selectedObject.value = null;
     }
   );
 
@@ -509,12 +384,9 @@ onMounted(() => {
         e.key === 'Delete' ||
         e.key === 'Backspace'
       ) {
-        const activeObjects =
-          canvas!.getActiveObjects();
+        const activeObjects = canvas!.getActiveObjects();
 
-        if (
-          activeObjects.length > 0
-        ) {
+        if ( activeObjects.length > 0 ) {
           canvas!.remove(
             ...activeObjects
           );
@@ -548,47 +420,49 @@ function autoZoomintoLabel() {
   if (!canvas || !labelRect)
     return;
 
-  const canvasWidth =
-    canvas.getWidth();
+  const canvasWidth = canvas.getWidth();
 
-  const canvasHeight =
-    canvas.getHeight();
+  const canvasHeight = canvas.getHeight();
 
-  const zoomX =
-    canvasWidth / labelRect.width!;
+  const zoomX = canvasWidth / labelRect.width!;
 
-  const zoomY =
-    canvasHeight /
+  const zoomY = canvasHeight /
     labelRect.height!;
 
-  const zoom =
-    Math.min(zoomX, zoomY) *
-    paddingFactor;
+  const zoom = Math.min(zoomX, zoomY) * paddingFactor;
 
-  const panX =
-    (canvasWidth -
-      labelRect.width! * zoom) /
-    2 -
-    labelRect.left! * zoom;
+  const panX = (canvasWidth - labelRect.width! * zoom) / 2 - labelRect.left! * zoom;
 
-  const panY =
-    (canvasHeight -
-      labelRect.height! * zoom) /
-    2 -
-    labelRect.top! * zoom;
+  const panY = (canvasHeight - labelRect.height! * zoom) / 2 - labelRect.top! * zoom;
 
-  canvas.setViewportTransform([
-    zoom,
-    0,
-    0,
-    zoom,
-    panX,
-    panY,
-  ]);
-
+  canvas.setViewportTransform([ zoom, 0, 0, zoom, panX, panY, ]);
   canvas.requestRenderAll();
 }
+function createResizeRect() {
+  const rect = new fabric.Rect({
+    left: 100,
+    top: 100,
+    width: 100,
+    height: 100,
+    fill: 'transparent',
+    stroke: 'black',
+    strokeWidth: 2,
+    strokeUniform: true, // 确保缩放过程中描边不失真
+  });
 
+  // 获取 fabric 默认的控制点改变 Size 的处理函数
+  // 'changeSize' 是 Fabric 内部专门用于 Textbox 这种只改宽度不改缩放的 action
+  const changeSizeAction = fabric.controlsUtils.changeObjectHeight;
+
+  // 针对矩形的 8个控制点，将 actionHandler 全部替换为修改尺寸
+  const controlNames = ['tl', 'tr', 'br', 'bl', 'ml', 'mr', 'mt', 'mb'];
+  
+  controlNames.forEach(controlName => {
+    rect.controls[controlName].actionHandler = changeSizeAction;
+  });
+
+  canvas.add(rect);
+}
 function addRect() {
   if (!canvas) return;
 
@@ -612,16 +486,15 @@ function addRect() {
 function addEllipse() {
   if (!canvas) return;
 
-  const ellipse =
-    new fabric.Ellipse({
-      left: 0,
-      top: 0,
-      originX: 'left',
-      originY: 'top',
-      fill: 'blue',
-      rx: 60,
-      ry: 30,
-    });
+  const ellipse = new fabric.Ellipse({
+    left: 0,
+    top: 0,
+    originX: 'left',
+    originY: 'top',
+    fill: 'blue',
+    rx: 60,
+    ry: 30,
+  });
 
   canvas.add(ellipse);
 
@@ -633,17 +506,16 @@ function addEllipse() {
 function addText() {
   if (!canvas) return;
 
-  const text =
-    new fabric.Textbox(
-      'Hello, world!',
-      {
-        left: 0,
-        top: 0,
-        originX: 'left',
-        originY: 'top',
-        fill: 'black',
-      }
-    );
+  const text = new fabric.Textbox(
+    'Hello, world!',
+    {
+      left: 0,
+      top: 0,
+      originX: 'left',
+      originY: 'top',
+      fill: 'black',
+    }
+  );
 
   canvas.add(text);
 
@@ -727,7 +599,7 @@ function addLine() {
           <v-icon>mdi-image-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
-          <v-icon @click="addRect">mdi-rectangle-outline</v-icon>
+          <v-icon @click="createResizeRect">mdi-rectangle-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
           <v-icon @click="addEllipse">mdi-circle-outline</v-icon>
