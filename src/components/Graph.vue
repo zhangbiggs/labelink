@@ -2,7 +2,14 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import * as fabric from 'fabric';
 import bwipjs from '@bwip-js/browser';
-import { EditablePolyline } from '@/utils/StaLine';
+import {
+  snap, customResizeControls,changeRectSize,
+  changeEllipseSize,
+  changeEllipseWidth,
+  changeEllipseHeight,
+} from '@/utils';
+// import { EditablePolyline } from '@/utils/StaLine';
+import { SampleLine } from '@/utils/SampleLine';
 const panels = ref([
   'dataSource',
   'positionSize',
@@ -19,13 +26,16 @@ let labelRect: fabric.Rect | null = null;
 const labelWidth = 3;
 const labelheight = 2;
 const dpi = 200;
-const paddingFactor = 0.7;
+// 获取.env 中的值
+const paddingFactor = parseFloat(import.meta.env.VITE_PaddingFactor) || 0.7;
+const MOVE_STEP = parseFloat(import.meta.env.VITE_MOVE_STEP) || 0.5;
 
 const selectedObject = ref<fabric.FabricObject | null>(null);
 
 const rulerThickness = 30;
 
 const isPanningMode = ref(false);
+
 
 function printSelectedObjectTable(object: fabric.FabricObject) {
   if (!object) return;
@@ -36,10 +46,10 @@ function printSelectedObjectTable(object: fabric.FabricObject) {
       height: object.height,
       left: object.left,
       top: object.top,
-      originX: object.originX,
-      originY: object.originY,
       scaleX: object.scaleX,
       scaleY: object.scaleY,
+      rx: (object as any).rx,
+      ry: (object as any).ry,
     },
   ]);
 }
@@ -358,7 +368,17 @@ onMounted(() => {
     }
   }
   );
+  // canvas.on('object:moving', (e) => {
 
+  //   const obj = e.target;
+
+  //   if (!obj) return;
+
+  //   obj.set({
+  //     left: snap(obj.left || 0),
+  //     top: snap(obj.top || 0),
+  //   });
+  // });
   canvas.on('mouse:move', (opt) => {
     if (!isPanning) return;
 
@@ -493,53 +513,6 @@ onBeforeUnmount(() => {
     handleResize
   );
 });
-const originOffset = {
-  left: -0.5,
-  top: -0.5,
-  center: 0,
-  bottom: 0.5,
-  right: 0.5,
-};
-/**
- * Resolves origin value relative to center
- * @private
- * @param {TOriginX | TOriginY} originValue originX / originY
- * @returns number
- */
-export type TOriginX = 'center' | 'left' | 'right' | number;
-export type TOriginY = 'center' | 'top' | 'bottom' | number;
-const resolveOrigin = (
-  originValue: TOriginX | TOriginY | number,
-): number =>
-  typeof originValue === 'string' ? originOffset[originValue] : originValue - 0.5;
-
-function resizeX(eventData: fabric.TPointerEvent, transform: fabric.Transform, x: number, y: number) {
-  const localPoint = fabric.controlsUtils.getLocalPoint(
-    transform,
-    transform.originX,
-    transform.originY,
-    x,
-    y,
-  );
-  const localPointValue = localPoint['x'];
-  //  make sure the control changes width ONLY from it's side of target
-  const originValue = resolveOrigin(transform[origin]);
-  if (
-    originValue === 0 ||
-    (originValue > 0 && localPointValue < 0) ||
-    (originValue < 0 && localPointValue > 0)
-  ) {
-    const { target } = transform,
-      strokePadding = target.strokeWidth / (target.strokeUniform ? target[scale] : 1),
-      multiplier = isTransformCentered(transform) ? 2 : 1,
-      oldWidth = target[dimension],
-      newWidth = Math.abs((localPointValue * multiplier) / target[scale]) - strokePadding;
-    target.set(dimension, Math.max(newWidth, 1));
-    //  check against actual target width in case `newWidth` was rejected
-    return oldWidth !== target[dimension];
-  }
-  return true;
-};
 function autoZoomintoLabel() {
   if (!canvas || !labelRect)
     return;
@@ -562,31 +535,34 @@ function autoZoomintoLabel() {
   canvas.setViewportTransform([zoom, 0, 0, zoom, panX, panY,]);
   canvas.requestRenderAll();
 }
-function customResizeHandler(eventData: fabric.TPointerEvent, transform: fabric.Transform, x: number, y: number) {
-  const { target, corner } = transform;
-  if (corner[0] === 'm') {
-    if (corner === 'ml' || corner === 'mr') {
-      fabric.controlsUtils.changeObjectWidth(eventData, transform, x, y);
-    } else if (corner === 'mt' || corner === 'mb') {
-      fabric.controlsUtils.changeObjectHeight(eventData, transform, x, y);
-    }
-    return true;
-  } else {
-    const isScaling = fabric.controlsUtils.scalingEqually(eventData, transform, x, y);
-    if (isScaling) {
-      const newWidth = target.width * target.scaleX;
-      const newHeight = target.height * target.scaleY;
-      // 3. 重置 scale 为 1，应用物理宽高
-      target.set({
-        width: newWidth,
-        height: newHeight,
-        scaleX: 1,
-        scaleY: 1,
-      });
-    }
-    return true;
-  }
-};
+// function customResizeHandler(eventData: fabric.TPointerEvent, transform: fabric.Transform, x: number, y: number) {
+//   const { target, corner } = transform;
+//   if (corner[0] === 'm') {
+//     if (corner === 'ml' || corner === 'mr') {
+//       // fabric.controlsUtils.changeObjectWidth(eventData, transform, x, y);
+//       return fabric.controlsUtils.changeWidth
+//     } else if (corner === 'mt' || corner === 'mb') {
+//       return fabric.controlsUtils.changeWidth
+//     }
+//     return true;
+//   } else {
+//     const isScaling = fabric.controlsUtils(eventData, transform, x, y);
+//     if (isScaling) {
+//       console.log('Scaling equally');
+//       console.log('Original scaleX:', target.scaleX, 'Original scaleY:', target.height);
+//       const newWidth = target.width * target.scaleX;
+//       const newHeight = target.height * target.scaleY;
+//       // 3. 重置 scale 为 1，应用物理宽高
+//       target.set({
+//         width: newWidth,
+//         height: newHeight,
+//         scaleX: 1,
+//         scaleY: 1,
+//       });
+//     }
+//     return true;
+//   }
+// };
 function addRect() {
   if (!canvas) return;
   const rect = new fabric.Rect({
@@ -601,17 +577,24 @@ function addRect() {
     strokeWidth: 2,
     strokeUniform: true, // 确保缩放过程中描边不失真
   });
-
-  // 获取 fabric 默认的控制点改变 Size 的处理函数
-  // 'changeSize' 是 Fabric 内部专门用于 Textbox 这种只改宽度不改缩放的 action
-  // const changeSizeAction = fabric.controlsUtils.changeSize ;
-  // const changeSizeAction = fabric.controlsUtils.customResizeHandler ;
-
-  // 针对矩形的 8个控制点，将 actionHandler 全部替换为修改尺寸
+  rect.controls = customResizeControls()
   const controlNames = ['tl', 'tr', 'br', 'bl', 'ml', 'mr', 'mt', 'mb'];
   controlNames.forEach(controlName => {
-    rect.controls[controlName].actionHandler = customResizeHandler
-  });
+    switch (controlName) {
+      case 'ml':
+      case 'mr':
+        rect.controls[controlName].actionHandler = fabric.controlsUtils.changeWidth;
+        break;
+      case 'mt':
+      case 'mb':
+        rect.controls[controlName].actionHandler = fabric.controlsUtils.changeHeight;
+        break;
+      default:
+        rect.controls[controlName].actionHandler = changeRectSize;
+        // 其他控制点保持默认行为
+        break;
+    }
+  })
 
   canvas.add(rect);
   canvas.setActiveObject(rect);
@@ -623,24 +606,59 @@ function addEllipse() {
   const ellipse = new fabric.Ellipse({
     left: 0,
     top: 0,
+    rx: 60,
+    ry: 60,
     originX: 'left',
     originY: 'top',
+    strokeWidth: 2,
+    stroke: 'black',
     fill: 'transparent',
-    rx: 60,
-    ry: 30,
   });
-
+  ellipse.controls = customResizeControls()
+  const controlNames = ['tl', 'tr', 'br', 'bl', 'ml', 'mr', 'mt', 'mb'];
+  controlNames.forEach(controlName => {
+    switch (controlName) {
+      case 'ml':
+      case 'mr':
+        ellipse.controls[controlName].actionHandler = changeEllipseWidth;
+        break;
+      case 'mt':
+      case 'mb':
+        ellipse.controls[controlName].actionHandler = changeEllipseHeight;
+        break;
+      default:
+        ellipse.controls[controlName].actionHandler = changeEllipseSize;
+        // 其他控制点保持默认行为
+        break;
+    }
+  })
   canvas.add(ellipse);
 
-  canvas.setActiveObject(
-    ellipse
+  canvas.setActiveObject(ellipse);
+}
+function addImage() {
+  if (!canvas) return;
+
+  const image = new fabric.Image(
+    document.getElementById('my-image') as HTMLImageElement,
+    {
+      left: 0,
+      top: 0,
+      originX: 'left',
+      originY: 'top',
+      // width: 100,
+      // height: 100,
+    }
   );
+  canvas.add(image);
+  canvas.setActiveObject(image);
 }
 
 function addText() {
   if (!canvas) return;
 
   const text = new fabric.Textbox(
+    // const text = new fabric.FabricText(
     'Hello, world!',
     {
       left: 0,
@@ -661,13 +679,14 @@ function addText() {
 function addLine() {
   if (!canvas) return;
 
-  const line = new EditablePolyline([
-    new fabric.Point({ x: 0, y: 0 }),
-    new fabric.Point({ x: 100, y: 100 })
-  ], {
-    stroke: 'black',
-    strokeWidth: 2
-  });
+  const line = new SampleLine(
+  new fabric.Point(100, 100),
+  new fabric.Point(300, 200),
+  {
+    stroke: '#000',
+    strokeWidth: 20,
+  }
+);
 
   canvas.add(line);
 
@@ -706,7 +725,7 @@ function addLine() {
         <v-btn icon="mdi-format-align-center"></v-btn>
         <v-btn icon="mdi-format-align-right"></v-btn>
       </v-btn-toggle>
-
+      <img id="my-image" src="@/assets/hero.png" alt="Placeholder Image">
       <v-spacer></v-spacer>
 
       <v-btn-toggle rounded="0" dense>
@@ -730,7 +749,7 @@ function addLine() {
           <v-icon @click="addText">mdi-format-text</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
-          <v-icon>mdi-image-outline</v-icon>
+          <v-icon @click="addImage">mdi-image-outline</v-icon>
         </v-list-item>
         <v-list-item link class="mb-2">
           <v-icon @click="addRect">mdi-rectangle-outline</v-icon>
@@ -746,7 +765,7 @@ function addLine() {
     </v-navigation-drawer>
 
     <!-- Right Properties Panel -->
-    <v-navigation-drawer app permanent location="right" width="300">
+    <!-- <v-navigation-drawer app permanent location="right" width="300">
       <v-toolbar title="Properties" flat></v-toolbar>
       <v-divider></v-divider>
       <v-expansion-panels variant="accordion" multiple v-model="panels">
@@ -778,10 +797,10 @@ function addLine() {
           </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
-    </v-navigation-drawer>
+    </v-navigation-drawer> -->
 
     <!-- Main Canvas -->
-    <v-main class="d-flex  align-center justify-center" style="background-color: #f0f0f0;">
+    <v-main class="d-flex" style="background-color: #f0f0f0;">
       <div class="w-100 h-100 d-flex flex-column">
         <div class="graph d-flex flex-column graph-wrap flex-grow-1" ref="graphContainerRef">
           <canvas ref="graphref"></canvas>
