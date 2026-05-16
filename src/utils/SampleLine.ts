@@ -60,30 +60,30 @@ export class SampleLine extends fabric.Line {
   }
 
   /**
-   * 初始化 controls
+   * 初始化 controls@ 
    */
   private initControls() {
     this.controls = {
-      start: new fabric.Control({
+      ml: new fabric.Control({
         positionHandler: this.createPositionHandler('start'),
         actionHandler: this.createActionHandler('start'),
         cursorStyle: 'pointer',
         actionName: 'modifyStartPoint',
-        // render: this.renderControl,
+        render: this.renderControl,
       }),
 
-      end: new fabric.Control({
+      mr: new fabric.Control({
         positionHandler: this.createPositionHandler('end'),
         actionHandler: this.createActionHandler('end'),
         cursorStyle: 'pointer',
         actionName: 'modifyEndPoint',
-        // render: this.renderControl,
+        render: this.renderControl,
       }),
     };
   }
 
   /**
-   * control 位置
+   * control 位置@todo需要重写 positionHandler ，位置不对，
    */
   private createPositionHandler(
     type: 'start' | 'end'
@@ -91,13 +91,46 @@ export class SampleLine extends fabric.Line {
     return (
       dim: any,
       finalMatrix: any,
-      fabricObject: StaLine
+      fabricObject: SampleLine
     ) => {
-      const point = type === 'start' ? fabricObject.startPoint : fabricObject.endPoint;
-      return fabric.util.transformPoint(point, fabricObject.canvas?.viewportTransform ?? fabric.iMatrix);
+      const linePoints = fabricObject.calcLinePoints();
+      const point = type === 'start'
+        ? new fabric.Point(linePoints.x1, linePoints.y1)
+        : new fabric.Point(linePoints.x2, linePoints.y2);
+      return point.transform(finalMatrix);
     };
   }
+  private renderControl(
 
+    ctx: CanvasRenderingContext2D,
+
+    left: number,
+
+    top: number
+
+  ) {
+
+    ctx.save();
+
+    ctx.translate(left, top);
+
+    ctx.fillStyle = '#4da3ff';
+
+    ctx.beginPath();
+
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+
+    ctx.fill();
+
+    ctx.lineWidth = 2;
+
+    ctx.strokeStyle = '#fff';
+
+    ctx.stroke();
+
+    ctx.restore();
+
+  }
   /**
    * control 拖动
    */

@@ -1,3 +1,4 @@
+
 // import * as fabric from 'fabric';
 import { controlsUtils, Control, type TPointerEvent, type Transform } from 'fabric';
 const defaultControls = controlsUtils.createObjectDefaultControls()

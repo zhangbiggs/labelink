@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import * as fabric from 'fabric';
 import bwipjs from '@bwip-js/browser';
 import {
-  snap, customResizeControls,changeRectSize,
+  snap, customResizeControls, changeRectSize,
   changeEllipseSize,
   changeEllipseWidth,
   changeEllipseHeight,
@@ -19,7 +19,7 @@ const panels = ref([
 
 const graphContainerRef = ref<HTMLDivElement | null>(null);
 const graphref = ref<HTMLCanvasElement | null>(null);
-const loadingStart = ref(false);
+// const loadingState = ref(false);
 let canvas: fabric.Canvas | null = null;
 let labelRect: fabric.Rect | null = null;
 
@@ -54,53 +54,80 @@ function printSelectedObjectTable(object: fabric.FabricObject) {
   ]);
 }
 
-// // 撤销/前进历史记录
-// let history: string[] = [];
-// let historyStep = -1;
+// 撤销/前进历史记录
+let history: string[] = [];
+let historyStep = -1;
 
-// function saveCanvasState() {
-//   if (!canvas) return;
-//   if (loadingStart.value) return;
-//   console.log('Saving canvas state, current history length:', history.length);
-//   // 移除当前步骤之后的所有历史
-//   if (historyStep < history.length - 1) {
-//     history = history.slice(0, historyStep + 1);
-//   }
+function saveCanvasState() {
+  if (!canvas) return;
+  // if (loadingState.value) return;
+  console.log('Saving canvas state, current history length:', history.length);
+  // 移除当前步骤之后的所有历史
+  if (historyStep < history.length - 1) {
+    history = history.slice(0, historyStep + 1);
+  }
 
-//   // 保存当前状态
-//   const state = JSON.stringify(canvas.toJSON());
-//   history.push(state);
-//   historyStep = history.length - 1;
-// }
+  // 保存当前状态
+  const state = JSON.stringify(canvas.toJSON());
+  history.push(state);
+  historyStep = history.length - 1;
+  // loadingState.value = false;
+}
 
-// function undo() {
-//   if (!canvas || historyStep <= 0) return;
+// Simple debounce helper to avoid saving state too frequently
+function debounce<T extends (...args: any[]) => any>(fn: T, wait = 300) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return function(this: any, ...args: Parameters<T>) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn.apply(this, args);
+      timer = null;
+    }, wait);
+  };
+}
 
-//   historyStep--;
-//   loadCanvasState(history[historyStep]);
-// }
+const debouncedSaveCanvasState = debounce(saveCanvasState, 300);
 
-// function redo() {
-//   if (!canvas || historyStep >= history.length - 1) return;
+function undo() {
+  if (!canvas || historyStep <= 0) return;
 
-//   historyStep++;
-//   loadCanvasState(history[historyStep]);
-// }
+  historyStep--;
+  loadCanvasState(history[historyStep]);
+}
 
-// function loadCanvasState(state: string) {
-//   if (!canvas) return;
-//   if (loadingStart.value) return
-//   loadingStart.value = true;
-//   try {
-//     canvas.loadFromJSON(state, () => {
-//       canvas!.requestRenderAll();
-//     });
-//     loadingStart.value = false;
-//   } catch (e) {
-//     loadingStart.value = false;
-//     console.error('Failed to load canvas state:', e);
-//   }
-// }
+function redo() {
+  if (!canvas || historyStep >= history.length - 1) return;
+
+  historyStep++;
+  loadCanvasState(history[historyStep]);
+}
+
+function loadCanvasState(state: string) {
+  if (!canvas) return;
+  // console.log('Loading canvas state:', loadingState.value, 'historyStep:', historyStep);
+  // if (loadingState.value) return
+  // loadingState.value = true;
+  try {
+    // mark loading state to avoid spurious saves while loading
+
+    canvas.loadFromJSON(state, () => {
+      // After JSON is loaded, ensure the labelRect (design area) stays non-selectable.
+      const found = canvas!.getObjects().find(o => (o as any).isLabelRect);
+      if (found) {
+        (found as any).selectable = false;
+        (found as any).evented = false;
+        labelRect = found as fabric.Rect;
+      }
+
+      canvas!.requestRenderAll();
+
+      // finished loading
+    });
+  } catch (e) {
+    console.error('Failed to load canvas state:', e);
+  }
+  
+}
 
 fabric.Rect.prototype.setControlsVisibility({ mtr: false, });
 fabric.Ellipse.prototype.setControlsVisibility({ mtr: false, });
@@ -344,13 +371,15 @@ onMounted(() => {
     strokeDashArray: [5, 5],
     selectable: false,
     evented: false,
+    // custom flag to identify the design label rect after loadFromJSON
+    isLabelRect: true,
     hoverCursor: 'default',
   });
   // labelRect 不可编辑
   canvas.add(labelRect);
 
   // 保存初始状态
-  // saveCanvasState();
+  saveCanvasState();
 
   let isPanning = false;
 
@@ -456,27 +485,27 @@ onMounted(() => {
     }
   );
 
-  // 监听对象修改、添加、移除事件以保存状态
-  // canvas.on('object:added', () => saveCanvasState());
-  // canvas.on('object:removed', () => saveCanvasState());
-  // canvas.on('object:modified', () => saveCanvasState());
+  // 监听对象修改、添加、移除事件以保存状态（使用防抖，避免频繁写入）
+  canvas.on('object:added', () => debouncedSaveCanvasState());
+  canvas.on('object:removed', () => debouncedSaveCanvasState());
+  canvas.on('object:modified', () => debouncedSaveCanvasState());
 
   document.addEventListener(
     'keydown',
     (e) => {
       // Ctrl+Z (Mac 为 Cmd+Z) - 撤销
-      // if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      //   e.preventDefault();
-      //   undo();
-      //   return;
-      // }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        return;
+      }
 
-      // // Ctrl+Y (Mac 为 Cmd+Y) 或 Ctrl+Shift+Z - 前进
-      // if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-      //   e.preventDefault();
-      //   redo();
-      //   return;
-      // }
+      // Ctrl+Y (Mac 为 Cmd+Y) 或 Ctrl+Shift+Z - 前进
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+        return;
+      }
 
       if (
         e.key === 'Delete' ||
@@ -497,7 +526,8 @@ onMounted(() => {
     }
   );
 
-  addRect();
+  // addRect();
+  addLine();
 
   autoZoomintoLabel();
 
@@ -535,34 +565,7 @@ function autoZoomintoLabel() {
   canvas.setViewportTransform([zoom, 0, 0, zoom, panX, panY,]);
   canvas.requestRenderAll();
 }
-// function customResizeHandler(eventData: fabric.TPointerEvent, transform: fabric.Transform, x: number, y: number) {
-//   const { target, corner } = transform;
-//   if (corner[0] === 'm') {
-//     if (corner === 'ml' || corner === 'mr') {
-//       // fabric.controlsUtils.changeObjectWidth(eventData, transform, x, y);
-//       return fabric.controlsUtils.changeWidth
-//     } else if (corner === 'mt' || corner === 'mb') {
-//       return fabric.controlsUtils.changeWidth
-//     }
-//     return true;
-//   } else {
-//     const isScaling = fabric.controlsUtils(eventData, transform, x, y);
-//     if (isScaling) {
-//       console.log('Scaling equally');
-//       console.log('Original scaleX:', target.scaleX, 'Original scaleY:', target.height);
-//       const newWidth = target.width * target.scaleX;
-//       const newHeight = target.height * target.scaleY;
-//       // 3. 重置 scale 为 1，应用物理宽高
-//       target.set({
-//         width: newWidth,
-//         height: newHeight,
-//         scaleX: 1,
-//         scaleY: 1,
-//       });
-//     }
-//     return true;
-//   }
-// };
+
 function addRect() {
   if (!canvas) return;
   const rect = new fabric.Rect({
@@ -657,8 +660,8 @@ function addImage() {
 function addText() {
   if (!canvas) return;
 
-  const text = new fabric.Textbox(
-    // const text = new fabric.FabricText(
+  // const text = new fabric.Textbox(
+  const text = new fabric.FabricText(
     'Hello, world!',
     {
       left: 0,
@@ -668,7 +671,20 @@ function addText() {
       fill: 'black',
     }
   );
-
+  text.lockScalingFlip = true; // 禁止水平或垂直翻转
+  text.lockScalingX = true; // 禁止水平缩放
+  text.lockScalingY = true; // 禁止垂直缩放
+  text.setControlsVisibility({
+    mtr: false, // 隐藏旋转控制点
+    tl: true,
+    tr: true,
+    bl: true,
+    br: true,
+    ml: false,
+    mr: false,
+    mt: false,
+    mb: false,
+  });
   canvas.add(text);
 
   canvas.setActiveObject(text);
@@ -680,13 +696,13 @@ function addLine() {
   if (!canvas) return;
 
   const line = new SampleLine(
-  new fabric.Point(100, 100),
-  new fabric.Point(300, 200),
-  {
-    stroke: '#000',
-    strokeWidth: 20,
-  }
-);
+    new fabric.Point(100, 100),
+    new fabric.Point(300, 200),
+    {
+      stroke: '#000',
+      strokeWidth: 20,
+    }
+  );
 
   canvas.add(line);
 
@@ -765,7 +781,7 @@ function addLine() {
     </v-navigation-drawer>
 
     <!-- Right Properties Panel -->
-    <!-- <v-navigation-drawer app permanent location="right" width="300">
+    <v-navigation-drawer app permanent location="right" width="300">
       <v-toolbar title="Properties" flat></v-toolbar>
       <v-divider></v-divider>
       <v-expansion-panels variant="accordion" multiple v-model="panels">
@@ -797,7 +813,7 @@ function addLine() {
           </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
-    </v-navigation-drawer> -->
+    </v-navigation-drawer>
 
     <!-- Main Canvas -->
     <v-main class="d-flex" style="background-color: #f0f0f0;">
